@@ -1,0 +1,51 @@
+@page
+@model Media.JoshHeaps.Net.Pages.ResendVerificationModel
+@{
+    ViewData["Title"] = "Resend Verification Email";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true" />
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Resend Verification Email</h1>
+            <p>Enter your email address to receive a new verification link</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger">
+                @Model.ErrorMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">
+                @Model.SuccessMessage
+            </div>
+        }
+
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <div class="form-group">
+                <label for="email" class="form-label">Email Address</label>
+                <input type="email" class="form-control" id="email" name="email"
+                       value="@Model.Email" autocomplete="email" required />
+                <div class="invalid-feedback"></div>
+            </div>
+
+            <button type="submit" class="btn-primary">Send Verification Email</button>
+        </form>
+
+        <div class="auth-footer">
+            <p>
+                <a href="/Login">Back to Login</a>
+            </p>
+        </div>
+    </div>
+</div>

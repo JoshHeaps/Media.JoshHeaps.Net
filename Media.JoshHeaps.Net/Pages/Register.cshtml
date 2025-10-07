@@ -1,0 +1,79 @@
+@page
+@model Media.JoshHeaps.Net.Pages.RegisterModel
+@{
+    ViewData["Title"] = "Register";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Create Account</h1>
+            <p>Sign up to get started</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger">
+                @Model.ErrorMessage
+            </div>
+        }
+
+        <form id="registerForm" method="post">
+            @Html.AntiForgeryToken()
+            <div class="form-group">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" name="email"
+                       value="@Model.Email" autocomplete="email" required />
+                <div class="invalid-feedback"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" name="username"
+                       value="@Model.Username" autocomplete="username" required
+                       pattern="[a-zA-Z0-9_]{3,50}"
+                       title="Username must be 3-50 characters, alphanumeric and underscores only" />
+                <div class="invalid-feedback"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="password" class="form-label">Password</label>
+                <div class="password-wrapper">
+                    <input type="password" class="form-control" id="password" name="password"
+                           autocomplete="new-password" required minlength="8" />
+                    <button type="button" class="password-toggle">Show</button>
+                </div>
+                <div class="invalid-feedback"></div>
+                <div class="password-strength">
+                    <div class="password-strength-bar"></div>
+                </div>
+                <div class="password-strength-text"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword" class="form-label">Confirm Password</label>
+                <div class="password-wrapper">
+                    <input type="password" class="form-control" id="confirmPassword" name="confirmPassword"
+                           autocomplete="new-password" required minlength="8" />
+                    <button type="button" class="password-toggle">Show</button>
+                </div>
+                <div class="invalid-feedback"></div>
+            </div>
+
+            <button type="submit" class="btn-primary">Create Account</button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Already have an account? <a href="/Login">Sign in</a></p>
+        </div>
+    </div>
+</div>

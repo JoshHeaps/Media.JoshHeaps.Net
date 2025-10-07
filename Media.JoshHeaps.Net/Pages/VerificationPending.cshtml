@@ -1,0 +1,59 @@
+@page
+@model Media.JoshHeaps.Net.Pages.VerificationPendingModel
+@{
+    ViewData["Title"] = "Check Your Email";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true" />
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Check Your Email</h1>
+            <p>We've sent you a verification link</p>
+        </div>
+
+        <div style="text-align: center; padding: 20px 0;">
+            <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style="margin-bottom: 20px;">
+                <circle cx="40" cy="40" r="38" stroke="#667eea" stroke-width="4"/>
+                <path d="M20 35 L40 50 L60 35" stroke="#667eea" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="20" y="30" width="40" height="25" stroke="#667eea" stroke-width="4" fill="none" rx="2"/>
+            </svg>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="margin: 0 0 15px 0; text-align: center;">
+                A verification email has been sent to:
+            </p>
+            <p style="margin: 0; text-align: center; font-weight: 600; color: #667eea;">
+                @Model.Email
+            </p>
+        </div>
+
+        <p style="text-align: center; color: #666; font-size: 14px; line-height: 1.6;">
+            Please check your inbox and click the verification link to activate your account.
+            The link will expire in 24 hours.
+        </p>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6;">
+            <p style="text-align: center; color: #666; font-size: 14px; margin-bottom: 15px;">
+                Didn't receive the email?
+            </p>
+            <p style="text-align: center;">
+                <a href="/ResendVerification?email=@Uri.EscapeDataString(Model.Email)"
+                   style="color: #667eea; text-decoration: none; font-weight: 500;">
+                    Resend verification email
+                </a>
+            </p>
+        </div>
+
+        <div class="auth-footer" style="margin-top: 30px;">
+            <p>
+                <a href="/Login">Back to Login</a>
+            </p>
+        </div>
+    </div>
+</div>

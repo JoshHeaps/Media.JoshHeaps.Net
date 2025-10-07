@@ -1,0 +1,50 @@
+@page
+@model Media.JoshHeaps.Net.Pages.VerifyEmailModel
+@{
+    ViewData["Title"] = "Verify Email";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true" />
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>@(Model.Success ? "Email Verified!" : "Verification Failed")</h1>
+        </div>
+
+        @if (Model.Success)
+        {
+            <div class="alert alert-success">
+                @Model.Message
+            </div>
+            <p style="text-align: center; margin-top: 20px;">
+                Your email has been successfully verified. You can now sign in to your account.
+            </p>
+            <a href="/Login" class="btn-primary" style="display: inline-block; text-align: center; text-decoration: none;">
+                Go to Login
+            </a>
+        }
+        else
+        {
+            <div class="alert alert-danger">
+                @Model.Message
+            </div>
+
+            @if (Model.ShowResendLink)
+            {
+                <p style="text-align: center; margin-top: 20px;">
+                    <a href="/ResendVerification" style="color: #667eea;">Request a new verification email</a>
+                </p>
+            }
+            else
+            {
+                <p style="text-align: center; margin-top: 20px;">
+                    <a href="/Login" style="color: #667eea;">Go to Login</a>
+                </p>
+            }
+        }
+    </div>
+</div>

@@ -19,7 +19,7 @@ public class EmailService
     {
         try
         {
-            var appUrl = _config["AppUrl"] ?? "http://localhost:5000";
+            var appUrl = _config["AppUrl"] ?? "https://media.joshheaps.net";
             var verificationUrl = $"{appUrl}/VerifyEmail?token={verificationToken}";
 
             var message = new MimeMessage();

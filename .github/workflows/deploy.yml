@@ -59,5 +59,10 @@ jobs:
             ${{ secrets.MEDIA_DEPLOY_USER }}@${{ secrets.SSH_HOST }} \
             "ssh josh@10.0.0.180 'mkdir -p /tmp/media-app-temp' && \
              scp -r /tmp/media-app-deploy/* josh@10.0.0.180:/tmp/media-app-temp/ && \
-             ssh josh@10.0.0.180 'sudo rsync -av --delete /tmp/media-app-temp/ /var/www/media-app/ && sudo systemctl restart media-app && rm -rf /tmp/media-app-temp' && \
+             ssh josh@10.0.0.180 'sudo rsync -av --delete --exclude=App_Data /tmp/media-app-temp/ /var/www/media-app/ && \
+                                  sudo mkdir -p /var/www/media-app/App_Data/media && \
+                                  sudo chown -R www-data:www-data /var/www/media-app/App_Data && \
+                                  sudo systemctl daemon-reload && \
+                                  sudo systemctl restart media-app && \
+                                  rm -rf /tmp/media-app-temp' && \
              rm -rf /tmp/media-app-deploy"

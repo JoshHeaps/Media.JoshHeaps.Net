@@ -45,7 +45,13 @@ jobs:
           ssh-keyscan -p "${{ secrets.SSH_PORT || 22 }}" "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts || true
       - name: Rsync to nginx server
         run: |
-          rsync -az --delete -e "ssh -p ${{ secrets.SSH_PORT || 22 }} -i ~/.ssh/deploy_key" \
+          echo "Connecting to: ${{ secrets.MEDIA_DEPLOY_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.SSH_PORT || 22 }}"
+          echo "Testing SSH connection first..."
+          ssh -v -i ~/.ssh/deploy_key -p "${{ secrets.SSH_PORT || 22 }}" \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.MEDIA_DEPLOY_USER }}@${{ secrets.SSH_HOST }} "echo 'SSH connection successful'"
+          echo "Running rsync..."
+          rsync -az --delete -e "ssh -p ${{ secrets.SSH_PORT || 22 }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             publish/ ${{ secrets.MEDIA_DEPLOY_USER }}@${{ secrets.SSH_HOST }}:/tmp/media-app-deploy/
       - name: Copy to media server and restart
         run: |

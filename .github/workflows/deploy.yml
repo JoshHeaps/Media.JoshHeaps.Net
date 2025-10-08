@@ -1,0 +1,49 @@
+name: Deploy to Media Server
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+    
+    - name: Publish
+      run: dotnet publish --configuration Release --no-build --output ./publish
+    
+    - name: Deploy to nginx server
+      uses: appleboy/scp-action@master
+      with:
+        host: joshheaps.net
+        username: deploy
+        key: ${{ secrets.NGINX_SSH_KEY }}
+        source: "publish/*"
+        target: "/tmp/media-app-deploy"
+        strip_components: 1
+    
+    - name: Copy to media server and restart
+      uses: appleboy/ssh-action@master
+      with:
+        host: joshheaps.net
+        username: deploy
+        key: ${{ secrets.NGINX_SSH_KEY }}
+        script: |
+          ssh -o StrictHostKeyChecking=no josh@10.0.0.180 "mkdir -p /tmp/media-app-temp"
+          scp -o StrictHostKeyChecking=no -r /tmp/media-app-deploy/* josh@10.0.0.180:/tmp/media-app-temp/
+          ssh -o StrictHostKeyChecking=no josh@10.0.0.180 "sudo rsync -av --delete /tmp/media-app-temp/ /var/www/media-app/ && sudo systemctl restart media-app && rm -rf /tmp/media-app-temp"
+          rm -rf /tmp/media-app-deploy

@@ -5,10 +5,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+builder.Services.AddControllers(); // Add controller support for API endpoints
 builder.Services.AddSingleton<DbExecutor>();
+builder.Services.AddSingleton<EncryptionService>(); // Singleton for encryption
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<MediaService>();
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();
@@ -38,5 +41,6 @@ app.UseSession();
 app.UseAuthorization();
 
 app.MapRazorPages();
+app.MapControllers(); // Map API controllers
 
 app.Run();

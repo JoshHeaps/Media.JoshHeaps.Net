@@ -78,4 +78,29 @@ public class DbExecutor(IConfiguration config)
 
         return default;
     }
+
+    // Returns a list using custom mapping
+    public async Task<List<T>> ExecuteListReaderAsync<T>(string query, Func<NpgsqlDataReader, T> mapper, object? parameters = null)
+    {
+        parameters ??= new();
+        using var conn = new NpgsqlConnection(ConnectionString);
+        await conn.OpenAsync();
+        using var cmd = new NpgsqlCommand(query, conn);
+
+        foreach (var prop in parameters.GetType().GetProperties())
+        {
+            cmd.Parameters.AddWithValue($"@{prop.Name}", prop.GetValue(parameters) ?? DBNull.Value);
+        }
+
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        var results = new List<T>();
+
+        while (await reader.ReadAsync())
+        {
+            results.Add(mapper(reader));
+        }
+
+        return results;
+    }
 }

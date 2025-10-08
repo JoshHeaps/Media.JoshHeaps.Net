@@ -7,6 +7,7 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/Home/page.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/gallery.css" asp-append-version="true" />
 }
 
 <div class="dashboard-container">
@@ -102,4 +103,57 @@
             <a href="/Logout" class="btn btn-danger">Logout</a>
         </div>
     </div>
+
+    <div class="card">
+        <h2>Upload Image</h2>
+        @if (!string.IsNullOrEmpty(Model.UploadMessage))
+        {
+            <div class="alert @(Model.UploadSuccess ? "alert-success" : "alert-error")">
+                @Model.UploadMessage
+            </div>
+        }
+        <form method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div class="form-group">
+                <label for="UploadedFile">Select Image</label>
+                <input type="file" id="UploadedFile" name="UploadedFile" accept="image/*" required />
+            </div>
+            <div class="form-group">
+                <label for="Description">Description (optional)</label>
+                <textarea id="Description" name="Description" rows="3" placeholder="Add a description..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>My Images (@Model.MediaItems.Count)</h2>
+        <div id="gallery" class="gallery-grid">
+            @foreach (var media in Model.MediaItems)
+            {
+                <div class="gallery-item" data-media-id="@media.Id">
+                    <img src="/api/media/image/@media.Id" alt="@media.FileName" loading="lazy" />
+                    @if (!string.IsNullOrEmpty(media.Description))
+                    {
+                        <div class="gallery-item-description">@media.Description</div>
+                    }
+                    <div class="gallery-item-info">
+                        <span class="gallery-item-date">@media.CreatedAt.ToString("MMM d, yyyy")</span>
+                        <form method="post" asp-page-handler="Delete" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="mediaId" value="@media.Id" />
+                            <button type="submit" class="btn-delete" onclick="return confirm('Are you sure you want to delete this image?');">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+        <div id="loading" style="display:none; text-align:center; padding:20px;">
+            Loading more images...
+        </div>
+    </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/gallery.js" asp-append-version="true"></script>
+}

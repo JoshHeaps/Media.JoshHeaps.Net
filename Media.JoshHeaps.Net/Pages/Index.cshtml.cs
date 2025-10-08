@@ -10,15 +10,21 @@ namespace Media.JoshHeaps.Net.Pages
 
         public async Task<IActionResult> OnGetAsync()
         {
-            if (!IsAuthenticated())
-            {
-                return Redirect("/Login");
-            }
+            RequireAuthentication();
 
             LoadUserSession();
 
             // Load user dashboard data
             Dashboard = await userService.GetUserDashboardAsync(UserId);
+
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostAsync()
+        {
+            RequireAuthentication();
+
+            LoadUserSession();
 
             return Page();
         }

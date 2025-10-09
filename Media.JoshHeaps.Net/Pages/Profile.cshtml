@@ -1,0 +1,180 @@
+@page
+@model Media.JoshHeaps.Net.Pages.ProfileModel
+@{
+    ViewData["Title"] = "Profile Settings";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/Home/page.css" asp-append-version="true" />
+    <style>
+        .profile-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .profile-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .profile-section h2 {
+            margin: 0 0 20px 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-primary);
+            padding-bottom: 12px;
+        }
+
+        .profile-field {
+            margin-bottom: 16px;
+        }
+
+        .profile-field label {
+            display: block;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .profile-field-value {
+            color: var(--text-primary);
+            font-size: 15px;
+        }
+
+        .theme-toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+        }
+
+        .theme-toggle-label {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .theme-toggle-label strong {
+            color: var(--text-primary);
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
+        .theme-toggle-label span {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            transition: 0.3s;
+            border-radius: 34px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--text-secondary);
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+            background-color: var(--bg-primary);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent-primary);
+            text-decoration: none;
+            font-size: 14px;
+            margin-bottom: 20px;
+            transition: color 0.2s ease;
+        }
+
+        .back-link:hover {
+            color: var(--accent-hover);
+        }
+    </style>
+}
+
+<div class="profile-container">
+    <a href="/" class="back-link">← Back to Dashboard</a>
+
+    <div class="profile-section">
+        <h2>Profile Information</h2>
+        <div class="profile-field">
+            <label>Username</label>
+            <div class="profile-field-value">@Model.Dashboard?.Username</div>
+        </div>
+        <div class="profile-field">
+            <label>Email</label>
+            <div class="profile-field-value">@Model.Dashboard?.Email</div>
+        </div>
+        <div class="profile-field">
+            <label>Email Status</label>
+            <div class="profile-field-value">
+                @if (Model.Dashboard?.EmailVerified == true)
+                {
+                    <span class="status-badge status-verified">Verified</span>
+                }
+                else
+                {
+                    <span class="status-badge status-unverified">Unverified</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="profile-section">
+        <h2>Appearance</h2>
+        <div class="theme-toggle-container">
+            <div class="theme-toggle-label">
+                <strong>Dark Mode</strong>
+                <span>Enable dark theme across the application</span>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="theme-toggle" />
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    </div>
+</div>

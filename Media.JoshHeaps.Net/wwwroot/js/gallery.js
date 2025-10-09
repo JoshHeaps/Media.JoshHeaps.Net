@@ -7,8 +7,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (addFilesBtn && uploadFormCard) {
         addFilesBtn.addEventListener('click', () => {
-            uploadFormCard.style.display = 'block';
-            addFilesBtn.classList.add('active');
+            if (addFilesBtn.classList.contains('active')) {
+                uploadFormCard.style.display = 'none';
+                addFilesBtn.classList.remove('active');
+            }
+            else {
+                uploadFormCard.style.display = 'block';
+                addFilesBtn.classList.add('active');
+            }
         });
 
         if (closeUploadBtn) {

@@ -13,11 +13,6 @@
 <div class="dashboard-container">
     <div class="welcome-section">
         <h1>Welcome back, @Model.Dashboard?.Username!</h1>
-        <p>Here's your account overview</p>
-    </div>
-
-    <div class="card">
-        <h2>Quick Actions</h2>
         <div class="quick-actions">
             @if (Model.Dashboard?.EmailVerified == false)
             {
@@ -40,17 +35,23 @@
                 @Model.UploadMessage
             </div>
         }
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" id="upload-form">
             @Html.AntiForgeryToken()
             <div class="form-group">
-                <label for="UploadedFile">Select Image</label>
-                <input type="file" id="UploadedFile" name="UploadedFile" accept="image/*" required />
+                <label for="UploadedFile">Select Image(s)</label>
+                <input type="file" id="UploadedFile" name="UploadedFile" accept="image/*" multiple required />
             </div>
             <div class="form-group">
                 <label for="Description">Description (optional)</label>
-                <textarea id="Description" name="Description" rows="3" placeholder="Add a description..."></textarea>
+                <textarea id="Description" name="Description" rows="3" placeholder="Add a description for all images..."></textarea>
             </div>
-            <button type="submit" class="btn btn-primary" asp-page-handler="Add">Upload</button>
+            <div id="upload-progress" style="display:none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">Uploading...</div>
+            </div>
+            <button type="submit" class="btn btn-primary" id="upload-btn">Upload</button>
         </form>
     </div>
 
@@ -89,4 +90,5 @@
 
 @section Scripts {
     <script src="~/js/gallery.js" asp-append-version="true"></script>
+    <script src="~/js/upload.js" asp-append-version="true"></script>
 }

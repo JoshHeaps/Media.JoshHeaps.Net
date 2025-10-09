@@ -1,4 +1,4 @@
-@page
+@page "{handler?}"
 @model Media.JoshHeaps.Net.Pages.IndexModel
 @{
     ViewData["Title"] = "Dashboard";
@@ -47,7 +47,7 @@
                 <label for="Description">Description (optional)</label>
                 <textarea id="Description" name="Description" rows="3" placeholder="Add a description..."></textarea>
             </div>
-            <button type="submit" class="btn btn-primary">Upload</button>
+            <button type="submit" class="btn btn-primary" asp-page-handler="Add">Upload</button>
         </form>
     </div>
 
@@ -64,10 +64,10 @@
                     }
                     <div class="gallery-item-info">
                         <span class="gallery-item-date">@media.CreatedAt.ToString("MMM d, yyyy")</span>
-                        <form method="post" asp-page-handler="Delete" style="display:inline;">
+                        <form method="post" style="display:inline;">
                             @Html.AntiForgeryToken()
-                            <input type="hidden" name="mediaId" value="@media.Id" />
-                            <button type="submit" class="btn-delete" onclick="return confirm('Are you sure you want to delete this image?');">Delete</button>
+                            <input type="hidden" name="MediaId" value="@media.Id" />
+                            <button type="submit" class="btn-delete" onclick="return confirm('Are you sure you want to delete this image?');" asp-page-handler="Delete">Delete</button>
                         </form>
                     </div>
                 </div>

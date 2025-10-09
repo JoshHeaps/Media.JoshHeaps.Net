@@ -17,6 +17,9 @@ namespace Media.JoshHeaps.Net.Pages
         [BindProperty]
         public string? Description { get; set; }
 
+        [BindProperty]
+        public long? MediaId { get; set; }
+
         public string? UploadMessage { get; set; }
         public bool UploadSuccess { get; set; }
 
@@ -35,6 +38,17 @@ namespace Media.JoshHeaps.Net.Pages
         }
 
         public async Task<IActionResult> OnPostAsync()
+        {
+            RequireAuthentication();
+            LoadUserSession();
+
+            Dashboard = await userService.GetUserDashboardAsync(UserId);
+            MediaItems = await _mediaService.GetUserMediaAsync(UserId, 0, 20);
+
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostAddAsync()
         {
             RequireAuthentication();
             LoadUserSession();
@@ -69,19 +83,19 @@ namespace Media.JoshHeaps.Net.Pages
                 }
             }
 
-            // Reload data
-            Dashboard = await userService.GetUserDashboardAsync(UserId);
-            MediaItems = await _mediaService.GetUserMediaAsync(UserId, 0, 20);
-
-            return Page();
+            // Redirect to prevent form resubmission on refresh
+            return RedirectToPage();
         }
 
-        public async Task<IActionResult> OnPostDeleteAsync(long mediaId)
+        public async Task<IActionResult> OnPostDeleteAsync()
         {
             RequireAuthentication();
             LoadUserSession();
 
-            var success = await _mediaService.DeleteMediaAsync(mediaId, UserId);
+            if (MediaId.HasValue)
+            {
+                var success = await _mediaService.DeleteMediaAsync(MediaId.Value, UserId);
+            }
 
             return RedirectToPage();
         }

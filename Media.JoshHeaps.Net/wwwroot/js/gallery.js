@@ -89,7 +89,7 @@ function createGalleryItem(media) {
 
     const form = document.createElement('form');
     form.method = 'post';
-    form.action = '/?handler=Delete';
+    form.action = '?handler=Delete'; // Relative to current page
     form.style.display = 'inline';
 
     // Add anti-forgery token
@@ -101,7 +101,7 @@ function createGalleryItem(media) {
 
     const hiddenInput = document.createElement('input');
     hiddenInput.type = 'hidden';
-    hiddenInput.name = 'mediaId';
+    hiddenInput.name = 'MediaId'; // Match C# property name exactly
     hiddenInput.value = media.id;
     form.appendChild(hiddenInput);
 
@@ -110,7 +110,10 @@ function createGalleryItem(media) {
     deleteBtn.className = 'btn-delete';
     deleteBtn.textContent = 'Delete';
     deleteBtn.onclick = function(e) {
-        return confirm('Are you sure you want to delete this image?');
+        if (!confirm('Are you sure you want to delete this image?')) {
+            e.preventDefault();
+            return false;
+        }
     };
     form.appendChild(deleteBtn);
 

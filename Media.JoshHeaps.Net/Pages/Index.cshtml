@@ -29,8 +29,11 @@
         </div>
     </div>
 
-    <div class="card">
-        <h2>Upload Image</h2>
+    <div class="card" id="upload-form-card" style="display:none;">
+        <div class="upload-form-header">
+            <h2>Upload Image</h2>
+            <button type="button" class="close-upload-form" id="close-upload-btn">&times;</button>
+        </div>
         @if (!string.IsNullOrEmpty(Model.UploadMessage))
         {
             <div class="alert @(Model.UploadSuccess ? "alert-success" : "alert-error")">
@@ -78,6 +81,11 @@
         </div>
     </div>
 </div>
+
+<!-- Floating Add Files Button -->
+<button type="button" class="floating-add-btn" id="add-files-btn" title="Add Files">
+    <span class="btn-icon">+</span>
+</button>
 
 @section Scripts {
     <script src="~/js/gallery.js" asp-append-version="true"></script>

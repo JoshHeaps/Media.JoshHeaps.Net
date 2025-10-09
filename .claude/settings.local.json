@@ -4,7 +4,8 @@
       "Bash(dotnet build)",
       "Bash(dotnet run:*)",
       "Bash(powershell:*)",
-      "Bash(dotnet script:*)"
+      "Bash(dotnet script:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,4 +1,4 @@
-@page
+@page "{handler?}"
 @model Media.JoshHeaps.Net.Pages.IndexModel
 @{
     ViewData["Title"] = "Dashboard";
@@ -13,11 +13,6 @@
 <div class="dashboard-container">
     <div class="welcome-section">
         <h1>Welcome back, @Model.Dashboard?.Username!</h1>
-        <p>Here's your account overview</p>
-    </div>
-
-    <div class="card">
-        <h2>Quick Actions</h2>
         <div class="quick-actions">
             @if (Model.Dashboard?.EmailVerified == false)
             {
@@ -25,29 +20,39 @@
                     Verify Email
                 </a>
             }
+            <a href="/Profile" class="btn btn-secondary">Edit Profile</a>
             <a href="/Logout" class="btn btn-danger">Logout</a>
         </div>
     </div>
 
-    <div class="card">
-        <h2>Upload Image</h2>
+    <div class="card" id="upload-form-card" style="display:none;">
+        <div class="upload-form-header">
+            <h2>Upload Image</h2>
+            <button type="button" class="close-upload-form" id="close-upload-btn">&times;</button>
+        </div>
         @if (!string.IsNullOrEmpty(Model.UploadMessage))
         {
             <div class="alert @(Model.UploadSuccess ? "alert-success" : "alert-error")">
                 @Model.UploadMessage
             </div>
         }
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" id="upload-form">
             @Html.AntiForgeryToken()
             <div class="form-group">
-                <label for="UploadedFile">Select Image</label>
-                <input type="file" id="UploadedFile" name="UploadedFile" accept="image/*" required />
+                <label for="UploadedFile">Select Image(s)</label>
+                <input type="file" id="UploadedFile" name="UploadedFile" accept="image/*" multiple required />
             </div>
             <div class="form-group">
                 <label for="Description">Description (optional)</label>
-                <textarea id="Description" name="Description" rows="3" placeholder="Add a description..."></textarea>
+                <textarea id="Description" name="Description" rows="3" placeholder="Add a description for all images..."></textarea>
             </div>
-            <button type="submit" class="btn btn-primary">Upload</button>
+            <div id="upload-progress" style="display:none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">Uploading...</div>
+            </div>
+            <button type="submit" class="btn btn-primary" id="upload-btn">Upload</button>
         </form>
     </div>
 
@@ -64,10 +69,10 @@
                     }
                     <div class="gallery-item-info">
                         <span class="gallery-item-date">@media.CreatedAt.ToString("MMM d, yyyy")</span>
-                        <form method="post" asp-page-handler="Delete" style="display:inline;">
+                        <form method="post" style="display:inline;">
                             @Html.AntiForgeryToken()
-                            <input type="hidden" name="mediaId" value="@media.Id" />
-                            <button type="submit" class="btn-delete" onclick="return confirm('Are you sure you want to delete this image?');">Delete</button>
+                            <input type="hidden" name="MediaId" value="@media.Id" />
+                            <button type="submit" class="btn-delete" onclick="return confirm('Are you sure you want to delete this image?');" asp-page-handler="Delete">Delete</button>
                         </form>
                     </div>
                 </div>
@@ -79,6 +84,12 @@
     </div>
 </div>
 
+<!-- Floating Add Files Button -->
+<button type="button" class="floating-add-btn" id="add-files-btn" title="Add Files">
+    <span class="btn-icon">+</span>
+</button>
+
 @section Scripts {
     <script src="~/js/gallery.js" asp-append-version="true"></script>
+    <script src="~/js/upload.js" asp-append-version="true"></script>
 }

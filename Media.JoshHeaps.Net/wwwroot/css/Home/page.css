@@ -5,23 +5,27 @@
 }
 
 .welcome-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 40px;
-    border-radius: 12px;
-    margin-bottom: 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    color: var(--text-primary);
+    padding: 32px 40px;
+    border-radius: 8px;
+    margin-bottom: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .welcome-section h1 {
-    margin: 0 0 10px 0;
-    font-size: 32px;
+    margin: 0;
+    font-size: 28px;
     font-weight: 600;
+    letter-spacing: -0.5px;
 }
 
 .welcome-section p {
     margin: 0;
-    opacity: 0.9;
+    opacity: 0.8;
     font-size: 16px;
 }
 
@@ -33,26 +37,31 @@
 }
 
 .card {
-    background: white;
-    border-radius: 12px;
-    padding: 30px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    padding: 24px;
+    transition: border-color 0.2s ease;
+}
+
+.card:hover {
+    border-color: var(--border-secondary);
 }
 
 .card h2 {
     margin: 0 0 20px 0;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
-    color: #333;
-    border-bottom: 2px solid #667eea;
-    padding-bottom: 10px;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-primary);
+    padding-bottom: 12px;
 }
 
 .info-row {
     display: flex;
     justify-content: space-between;
     padding: 12px 0;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-secondary);
 }
 
 .info-row:last-child {
@@ -61,78 +70,86 @@
 
 .info-label {
     font-weight: 500;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .info-value {
-    color: #333;
+    color: var(--text-primary);
     font-weight: 500;
 }
 
 .status-badge {
     display: inline-block;
     padding: 4px 12px;
-    border-radius: 12px;
+    border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
 }
 
 .status-verified {
-    background: #d4edda;
-    color: #155724;
+    background: rgba(63, 185, 80, 0.15);
+    color: var(--success);
 }
 
 .status-unverified {
-    background: #fff3cd;
-    color: #856404;
+    background: rgba(187, 128, 9, 0.15);
+    color: #d29922;
 }
 
 .quick-actions {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-    margin-top: 20px;
+    align-content: space-evenly;
 }
 
 .btn {
-    padding: 10px 20px;
+    padding: 8px 16px;
     border-radius: 6px;
     text-decoration: none;
     font-weight: 500;
+    font-size: 14px;
     display: inline-block;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
 }
 
 .btn-primary {
-    background: #667eea;
-    color: white;
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    border-color: var(--accent-primary);
 }
 
 .btn-primary:hover {
-    background: #5568d3;
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
 }
 
 .btn-secondary {
-    background: #6c757d;
-    color: white;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-primary);
 }
 
 .btn-secondary:hover {
-    background: #5a6268;
+    background: var(--bg-hover);
+    border-color: var(--border-secondary);
 }
 
 .btn-danger {
-    background: #dc3545;
-    color: white;
+    background: transparent;
+    color: var(--danger);
+    border-color: var(--danger);
 }
 
 .btn-danger:hover {
-    background: #c82333;
+    background: var(--danger);
+    color: var(--text-primary);
 }
 
 .empty-state {
     text-align: center;
-    color: #999;
+    color: var(--text-secondary);
     padding: 20px;
     font-style: italic;
 }

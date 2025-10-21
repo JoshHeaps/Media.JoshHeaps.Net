@@ -55,6 +55,16 @@ public class FolderApi : ControllerBase
             return BadRequest(new { error = "Folder name is required" });
         }
 
+        // If parent folder specified, check ownership (can't create in shared folders)
+        if (request.ParentFolderId.HasValue)
+        {
+            var parentOwnerId = await _folderService.GetFolderOwnerIdAsync(request.ParentFolderId.Value);
+            if (parentOwnerId != userId.Value)
+            {
+                return Forbid("Cannot create folders in shared folders");
+            }
+        }
+
         var folder = await _folderService.CreateFolderAsync(userId.Value, request.Name, request.ParentFolderId);
         if (folder == null)
         {
@@ -78,6 +88,13 @@ public class FolderApi : ControllerBase
             return BadRequest(new { error = "New folder name is required" });
         }
 
+        // Check ownership (can't rename shared folders)
+        var ownerId = await _folderService.GetFolderOwnerIdAsync(request.FolderId);
+        if (ownerId != userId.Value)
+        {
+            return Forbid("Cannot rename shared folders");
+        }
+
         var success = await _folderService.RenameFolderAsync(request.FolderId, userId.Value, request.NewName);
         if (!success)
         {
@@ -96,6 +113,13 @@ public class FolderApi : ControllerBase
             return Unauthorized(new { error = "Not authenticated" });
         }
 
+        // Check ownership (can't delete shared folders)
+        var ownerId = await _folderService.GetFolderOwnerIdAsync(folderId);
+        if (ownerId != userId.Value)
+        {
+            return Forbid("Cannot delete shared folders");
+        }
+
         var success = await _folderService.DeleteFolderAsync(folderId, userId.Value, deleteContents);
         if (!success)
         {
@@ -112,6 +136,13 @@ public class FolderApi : ControllerBase
         if (userId == null)
         {
             return Unauthorized(new { error = "Not authenticated" });
+        }
+
+        // Check ownership (can't move shared folders)
+        var ownerId = await _folderService.GetFolderOwnerIdAsync(request.FolderId);
+        if (ownerId != userId.Value)
+        {
+            return Forbid("Cannot move shared folders");
         }
 
         var success = await _folderService.MoveFolderAsync(request.FolderId, userId.Value, request.NewParentFolderId);

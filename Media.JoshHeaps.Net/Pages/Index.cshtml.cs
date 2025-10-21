@@ -13,7 +13,12 @@ namespace Media.JoshHeaps.Net.Pages
         public List<UserMedia> MediaItems { get; set; } = new();
         public List<Folder> Folders { get; set; } = new();
         public List<Folder> FolderPath { get; set; } = new();
+        public List<SharedFolderInfo> SharedFolders { get; set; } = new();
         public long? CurrentFolderId { get; set; }
+        public bool IsSharedFolder { get; set; }
+        public long? FolderOwnerId { get; set; }
+        public string? SharedByUsername { get; set; }
+        public string ViewMode { get; set; } = "own"; // "own", "shared", "all"
 
         [BindProperty]
         public IFormFile? UploadedFile { get; set; }
@@ -27,24 +32,76 @@ namespace Media.JoshHeaps.Net.Pages
         public string? UploadMessage { get; set; }
         public bool UploadSuccess { get; set; }
 
-        public async Task<IActionResult> OnGetAsync(long? folderId = null)
+        public async Task<IActionResult> OnGetAsync(long? folderId = null, string? view = "own")
         {
             RequireAuthentication();
             LoadUserSession();
 
             CurrentFolderId = folderId;
+            ViewMode = view ?? "own";
 
             // Load user dashboard data
             Dashboard = await userService.GetUserDashboardAsync(UserId);
 
-            // Load folders in current directory
-            Folders = await _folderService.GetUserFoldersAsync(UserId, CurrentFolderId);
+            // Check if current folder is shared with user
+            if (CurrentFolderId.HasValue)
+            {
+                FolderOwnerId = await _folderService.GetFolderOwnerIdAsync(CurrentFolderId.Value);
+                IsSharedFolder = FolderOwnerId != UserId;
+
+                if (IsSharedFolder && FolderOwnerId.HasValue)
+                {
+                    // Get owner info for display
+                    var ownerDashboard = await userService.GetUserDashboardAsync(FolderOwnerId.Value);
+                    SharedByUsername = ownerDashboard?.Username;
+                }
+            }
+
+            // Load folders based on view mode
+            if (ViewMode == "shared")
+            {
+                // Show only shared folders at root level
+                SharedFolders = await _folderService.GetSharedFoldersAsync(UserId);
+                if (!CurrentFolderId.HasValue)
+                {
+                    Folders = new List<Folder>();
+                }
+                else if (IsSharedFolder && FolderOwnerId.HasValue)
+                {
+                    Folders = await _folderService.GetUserFoldersAsync(FolderOwnerId.Value, CurrentFolderId);
+                }
+            }
+            else if (ViewMode == "own")
+            {
+                // Show only own folders
+                if (!IsSharedFolder)
+                {
+                    Folders = await _folderService.GetUserFoldersAsync(UserId, CurrentFolderId);
+                }
+            }
+            else // "all"
+            {
+                // Show both own and shared
+                Folders = await _folderService.GetUserFoldersAsync(UserId, CurrentFolderId);
+                if (!CurrentFolderId.HasValue)
+                {
+                    SharedFolders = await _folderService.GetSharedFoldersAsync(UserId);
+                }
+            }
 
             // Load folder path (breadcrumbs)
-            FolderPath = await _folderService.GetFolderPathAsync(CurrentFolderId, UserId);
+            if (IsSharedFolder && FolderOwnerId.HasValue)
+            {
+                FolderPath = await _folderService.GetFolderPathAsync(CurrentFolderId, FolderOwnerId.Value);
+            }
+            else
+            {
+                FolderPath = await _folderService.GetFolderPathAsync(CurrentFolderId, UserId);
+            }
 
-            // Load initial set of media
-            MediaItems = await _mediaService.GetUserMediaAsync(UserId, 0, 20, CurrentFolderId);
+            // Load initial set of media (with access check for shared folders)
+            var effectiveUserId = IsSharedFolder && FolderOwnerId.HasValue ? FolderOwnerId.Value : UserId;
+            MediaItems = await _mediaService.GetUserMediaAsync(effectiveUserId, 0, 20, CurrentFolderId, UserId);
 
             return Page();
         }

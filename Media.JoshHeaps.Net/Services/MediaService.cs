@@ -8,13 +8,15 @@ public class MediaService
     private readonly IWebHostEnvironment _environment;
     private readonly EncryptionService _encryption;
     private readonly ILogger<MediaService> _logger;
+    private readonly FolderService _folderService;
 
-    public MediaService(DbExecutor db, IWebHostEnvironment environment, EncryptionService encryption, ILogger<MediaService> logger)
+    public MediaService(DbExecutor db, IWebHostEnvironment environment, EncryptionService encryption, ILogger<MediaService> logger, FolderService folderService)
     {
         _db = db;
         _environment = environment;
         _encryption = encryption;
         _logger = logger;
+        _folderService = folderService;
     }
 
     public async Task<UserMedia?> SaveMediaAsync(long userId, IFormFile file, string? description = null, long? folderId = null)
@@ -129,17 +131,35 @@ public class MediaService
         }
     }
 
-    public async Task<List<UserMedia>> GetUserMediaAsync(long userId, int offset = 0, int limit = 20, long? folderId = null)
+    public async Task<List<UserMedia>> GetUserMediaAsync(long userId, int offset = 0, int limit = 20, long? folderId = null, long? requestingUserId = null)
     {
         try
         {
+            // If requestingUserId is provided, check access for shared folders
+            var effectiveUserId = userId;
+            if (requestingUserId.HasValue && folderId.HasValue)
+            {
+                var hasAccess = await _folderService.HasFolderAccessAsync(folderId.Value, requestingUserId.Value);
+                if (!hasAccess)
+                {
+                    _logger.LogWarning("User {RequestingUserId} does not have access to folder {FolderId}", requestingUserId.Value, folderId.Value);
+                    return new List<UserMedia>();
+                }
+                // Get the actual owner of the folder
+                var ownerId = await _folderService.GetFolderOwnerIdAsync(folderId.Value);
+                if (ownerId.HasValue)
+                {
+                    effectiveUserId = ownerId.Value;
+                }
+            }
+
             string query;
             if (folderId.HasValue)
             {
                 query = @"
                     SELECT id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, folder_id, created_at, updated_at
                     FROM app.user_media
-                    WHERE user_id = @userId AND folder_id = @folderId
+                    WHERE user_id = @effectiveUserId AND folder_id = @folderId
                     ORDER BY created_at DESC
                     OFFSET @offset LIMIT @limit";
             }
@@ -148,7 +168,7 @@ public class MediaService
                 query = @"
                     SELECT id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, folder_id, created_at, updated_at
                     FROM app.user_media
-                    WHERE user_id = @userId AND folder_id IS NULL
+                    WHERE user_id = @effectiveUserId AND folder_id IS NULL
                     ORDER BY created_at DESC
                     OFFSET @offset LIMIT @limit";
             }
@@ -171,7 +191,7 @@ public class MediaService
                     CreatedAt = reader.GetDateTime(11),
                     UpdatedAt = reader.GetDateTime(12)
                 };
-            }, new { userId, folderId, offset, limit });
+            }, new { effectiveUserId, folderId, offset, limit });
 
             return mediaList;
         }
@@ -186,10 +206,11 @@ public class MediaService
     {
         try
         {
+            // First, get the media item
             var query = @"
                 SELECT id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, folder_id, created_at, updated_at
                 FROM app.user_media
-                WHERE id = @mediaId AND user_id = @userId";
+                WHERE id = @mediaId";
 
             var media = await _db.ExecuteReaderAsync(query, reader =>
             {
@@ -209,9 +230,27 @@ public class MediaService
                     CreatedAt = reader.GetDateTime(11),
                     UpdatedAt = reader.GetDateTime(12)
                 };
-            }, new { mediaId, userId });
+            }, new { mediaId });
 
-            return media;
+            if (media == null)
+            {
+                return null;
+            }
+
+            // Check if user owns the media
+            if (media.UserId == userId)
+            {
+                return media;
+            }
+
+            // Check if user has access via shared folder
+            if (media.FolderId.HasValue && await _folderService.HasFolderAccessAsync(media.FolderId.Value, userId))
+            {
+                return media;
+            }
+
+            // User doesn't have access
+            return null;
         }
         catch (Exception ex)
         {

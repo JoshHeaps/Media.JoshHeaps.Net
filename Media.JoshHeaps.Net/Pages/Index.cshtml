@@ -59,14 +59,28 @@
     <div class="card">
         <div class="gallery-header">
             <div class="breadcrumb-nav">
-                <a href="/">Home</a>
+                <a href="/?view=@Model.ViewMode">Home</a>
                 @foreach (var folder in Model.FolderPath)
                 {
                     <span class="breadcrumb-separator">/</span>
-                    <a href="/?folderId=@folder.Id">@folder.Name</a>
+                    <a href="/?folderId=@folder.Id&view=@Model.ViewMode">@folder.Name</a>
+                }
+                @if (Model.IsSharedFolder && !string.IsNullOrEmpty(Model.SharedByUsername))
+                {
+                    <span class="shared-indicator">(Shared by @Model.SharedByUsername)</span>
                 }
             </div>
-            <button type="button" class="btn btn-secondary" id="new-folder-btn">New Folder</button>
+            <div class="header-actions">
+                <div class="view-mode-toggle">
+                    <a href="/?view=own" class="view-mode-btn @(Model.ViewMode == "own" ? "active" : "")">My Folders</a>
+                    <a href="/?view=shared" class="view-mode-btn @(Model.ViewMode == "shared" ? "active" : "")">Shared with Me</a>
+                    <a href="/?view=all" class="view-mode-btn @(Model.ViewMode == "all" ? "active" : "")">All</a>
+                </div>
+                @if (!Model.IsSharedFolder)
+                {
+                    <button type="button" class="btn btn-secondary" id="new-folder-btn">New Folder</button>
+                }
+            </div>
         </div>
         <h2>
             @if (Model.CurrentFolderId.HasValue)
@@ -82,7 +96,10 @@
         <div id="gallery" class="gallery-grid">
             @if (Model.CurrentFolderId.HasValue)
             {
-                <div class="gallery-item folder-item" data-folder-id="back" onclick="window.location.href='/?folderId=@(Model.FolderPath.Count > 1 ? Model.FolderPath[Model.FolderPath.Count - 2].Id.ToString() : "")'">
+                var backUrl = Model.FolderPath.Count > 1
+                    ? $"/?folderId={Model.FolderPath[Model.FolderPath.Count - 2].Id}&view={Model.ViewMode}"
+                    : $"/?view={Model.ViewMode}";
+                <div class="gallery-item folder-item" data-folder-id="back" onclick="window.location.href='@backUrl'">
                     <div class="folder-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M9 6l6 6-6 6"/>
@@ -91,19 +108,38 @@
                     <div class="folder-name">..</div>
                 </div>
             }
+            @foreach (var sharedFolder in Model.SharedFolders)
+            {
+                <div class="gallery-item folder-item shared-folder-item" data-folder-id="@sharedFolder.FolderId" onclick="window.location.href='/?folderId=@sharedFolder.FolderId&view=@Model.ViewMode'">
+                    <div class="folder-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                            <path d="M20 12h-2m-2 0h-2" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+                    <div class="folder-name">
+                        @sharedFolder.FolderName
+                        <span class="shared-badge">Shared by @sharedFolder.OwnerUsername</span>
+                    </div>
+                </div>
+            }
             @foreach (var folder in Model.Folders)
             {
-                <div class="gallery-item folder-item" data-folder-id="@folder.Id" onclick="window.location.href='/?folderId=@folder.Id'">
+                <div class="gallery-item folder-item @(folder.UserId != Model.UserId ? "shared-folder-item" : "")" data-folder-id="@folder.Id" data-owner-id="@folder.UserId" onclick="window.location.href='/?folderId=@folder.Id&view=@Model.ViewMode'">
                     <div class="folder-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
                     </div>
                     <div class="folder-name">@folder.Name</div>
-                    <div class="folder-actions">
-                        <button type="button" class="btn-action" onclick="event.stopPropagation(); renameFolder(@folder.Id, '@folder.Name')">Rename</button>
-                        <button type="button" class="btn-action" onclick="event.stopPropagation(); deleteFolder(@folder.Id)">Delete</button>
-                    </div>
+                    @if (folder.UserId == Model.UserId && !Model.IsSharedFolder)
+                    {
+                        <div class="folder-actions">
+                            <button type="button" class="btn-action" onclick="event.stopPropagation(); showShareModal(@folder.Id, '@folder.Name')">Share</button>
+                            <button type="button" class="btn-action" onclick="event.stopPropagation(); renameFolder(@folder.Id, '@folder.Name')">Rename</button>
+                            <button type="button" class="btn-action" onclick="event.stopPropagation(); deleteFolder(@folder.Id)">Delete</button>
+                        </div>
+                    }
                 </div>
             }
             @foreach (var media in Model.MediaItems)
@@ -147,18 +183,47 @@
     </div>
 </div>
 
-<!-- Floating Add Files Button -->
-<button type="button" class="floating-add-btn" id="add-files-btn" title="Add Files">
-    <span class="btn-icon">+</span>
-</button>
+<!-- Share Folder Modal -->
+<div id="share-modal" class="modal" style="display: none;">
+    <div class="modal-backdrop" onclick="closeShareModal()"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3>Share Folder: <span id="share-folder-name"></span></h3>
+            <button type="button" class="modal-close" onclick="closeShareModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="user-search">Search users by email or username</label>
+                <input type="text" id="user-search" class="form-control" placeholder="Type to search..." />
+                <div id="user-search-results" class="search-results"></div>
+            </div>
+            <div class="shared-users-section">
+                <h4>Shared with:</h4>
+                <div id="shared-users-list" class="shared-users-list">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Add Files Button (hidden in shared folders) -->
+@if (!Model.IsSharedFolder)
+{
+    <button type="button" class="floating-add-btn" id="add-files-btn" title="Add Files">
+        <span class="btn-icon">+</span>
+    </button>
+}
 
 @section Scripts {
     <script>
         const currentFolderId = @(Model.CurrentFolderId?.ToString() ?? "null");
+        const isSharedFolder = @(Model.IsSharedFolder.ToString().ToLower());
     </script>
     <script src="~/js/gallery.js" asp-append-version="true"></script>
     <script src="~/js/upload.js" asp-append-version="true"></script>
     <script src="~/js/folders.js" asp-append-version="true"></script>
+    <script src="~/js/folder-sharing.js" asp-append-version="true"></script>
     <script src="~/js/drag-drop.js" asp-append-version="true"></script>
     <script src="~/js/context-menu.js" asp-append-version="true"></script>
 }

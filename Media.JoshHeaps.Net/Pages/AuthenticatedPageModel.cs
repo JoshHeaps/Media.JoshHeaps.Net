@@ -5,7 +5,7 @@ namespace Media.JoshHeaps.Net.Pages;
 
 public abstract class AuthenticatedPageModel : PageModel
 {
-    protected long UserId { get; private set; }
+    public long UserId { get; private set; }
     protected string Username { get; private set; } = string.Empty;
     protected string Email { get; private set; } = string.Empty;
     protected bool EmailVerified { get; private set; }

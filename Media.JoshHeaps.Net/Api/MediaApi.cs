@@ -16,7 +16,7 @@ public class MediaApi : ControllerBase
     }
 
     [HttpGet("load")]
-    public async Task<IActionResult> LoadMedia([FromQuery] int offset = 0, [FromQuery] int limit = 20)
+    public async Task<IActionResult> LoadMedia([FromQuery] int offset = 0, [FromQuery] int limit = 20, [FromQuery] long? folderId = null)
     {
         // Get user ID from JWT claims or session
         var userId = GetUserIdFromAuth();
@@ -25,7 +25,7 @@ public class MediaApi : ControllerBase
             return Unauthorized();
         }
 
-        var media = await _mediaService.GetUserMediaAsync(userId.Value, offset, limit);
+        var media = await _mediaService.GetUserMediaAsync(userId.Value, offset, limit, folderId);
 
         return Ok(media);
     }
@@ -58,6 +58,102 @@ public class MediaApi : ControllerBase
         return File(imageData, media.MimeType);
     }
 
+    [HttpPost("upload")]
+    public async Task<IActionResult> UploadImage([FromForm] IFormFile file, [FromForm] string? description, [FromForm] long? folderId)
+    {
+        // Get user ID from JWT claims or session
+        var userId = GetUserIdFromAuth();
+        if (userId == null)
+        {
+            return Unauthorized(new { error = "Not authenticated" });
+        }
+
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { error = "No file provided" });
+        }
+
+        // Validate file type
+        var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+        if (!allowedTypes.Contains(file.ContentType.ToLower()))
+        {
+            return BadRequest(new { error = "Invalid file type. Only images (JPG, PNG, GIF, WEBP) are allowed" });
+        }
+
+        // Validate file size (10MB limit)
+        if (file.Length > 10 * 1024 * 1024)
+        {
+            return BadRequest(new { error = "File size exceeds 10MB limit" });
+        }
+
+        // Save media using existing service
+        var media = await _mediaService.SaveMediaAsync(userId.Value, file, description, folderId);
+        if (media == null)
+        {
+            return StatusCode(500, new { error = "Failed to upload image" });
+        }
+
+        return Ok(media);
+    }
+
+    [HttpPut("move")]
+    public async Task<IActionResult> MoveMedia([FromBody] MoveMediaRequest request)
+    {
+        // Get user ID from JWT claims or session
+        var userId = GetUserIdFromAuth();
+        if (userId == null)
+        {
+            return Unauthorized(new { error = "Not authenticated" });
+        }
+
+        var success = await _mediaService.MoveMediaToFolderAsync(request.MediaId, userId.Value, request.FolderId);
+        if (!success)
+        {
+            return BadRequest(new { error = "Failed to move media" });
+        }
+
+        return Ok(new { success = true });
+    }
+
+    [HttpPut("move-bulk")]
+    public async Task<IActionResult> MoveBulkMedia([FromBody] MoveBulkMediaRequest request)
+    {
+        // Get user ID from JWT claims or session
+        var userId = GetUserIdFromAuth();
+        if (userId == null)
+        {
+            return Unauthorized(new { error = "Not authenticated" });
+        }
+
+        if (request.MediaIds == null || !request.MediaIds.Any())
+        {
+            return BadRequest(new { error = "No media IDs provided" });
+        }
+
+        var successCount = 0;
+        var failedIds = new List<long>();
+
+        foreach (var mediaId in request.MediaIds)
+        {
+            var success = await _mediaService.MoveMediaToFolderAsync(mediaId, userId.Value, request.FolderId);
+            if (success)
+            {
+                successCount++;
+            }
+            else
+            {
+                failedIds.Add(mediaId);
+            }
+        }
+
+        return Ok(new {
+            success = failedIds.Count == 0,
+            movedCount = successCount,
+            failedCount = failedIds.Count,
+            failedIds = failedIds
+        });
+    }
+
     /// <summary>
     /// Gets user ID from either JWT claims (for API) or session (for web)
     /// </summary>
@@ -80,3 +176,6 @@ public class MediaApi : ControllerBase
         return null;
     }
 }
+
+public record MoveMediaRequest(long MediaId, long? FolderId);
+public record MoveBulkMediaRequest(List<long> MediaIds, long? FolderId);

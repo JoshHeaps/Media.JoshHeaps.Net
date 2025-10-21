@@ -4,12 +4,16 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Media.JoshHeaps.Net.Pages
 {
-    public class IndexModel(UserService userService, MediaService mediaService) : AuthenticatedPageModel
+    public class IndexModel(UserService userService, MediaService mediaService, FolderService folderService) : AuthenticatedPageModel
     {
         private readonly MediaService _mediaService = mediaService;
+        private readonly FolderService _folderService = folderService;
 
         public UserDashboard? Dashboard { get; set; }
         public List<UserMedia> MediaItems { get; set; } = new();
+        public List<Folder> Folders { get; set; } = new();
+        public List<Folder> FolderPath { get; set; } = new();
+        public long? CurrentFolderId { get; set; }
 
         [BindProperty]
         public IFormFile? UploadedFile { get; set; }
@@ -23,27 +27,38 @@ namespace Media.JoshHeaps.Net.Pages
         public string? UploadMessage { get; set; }
         public bool UploadSuccess { get; set; }
 
-        public async Task<IActionResult> OnGetAsync()
+        public async Task<IActionResult> OnGetAsync(long? folderId = null)
         {
             RequireAuthentication();
             LoadUserSession();
+
+            CurrentFolderId = folderId;
 
             // Load user dashboard data
             Dashboard = await userService.GetUserDashboardAsync(UserId);
 
+            // Load folders in current directory
+            Folders = await _folderService.GetUserFoldersAsync(UserId, CurrentFolderId);
+
+            // Load folder path (breadcrumbs)
+            FolderPath = await _folderService.GetFolderPathAsync(CurrentFolderId, UserId);
+
             // Load initial set of media
-            MediaItems = await _mediaService.GetUserMediaAsync(UserId, 0, 20);
+            MediaItems = await _mediaService.GetUserMediaAsync(UserId, 0, 20, CurrentFolderId);
 
             return Page();
         }
 
-        public async Task<IActionResult> OnPostAsync()
+        public async Task<IActionResult> OnPostAsync(long? folderId = null)
         {
             RequireAuthentication();
             LoadUserSession();
 
+            CurrentFolderId = folderId;
             Dashboard = await userService.GetUserDashboardAsync(UserId);
-            MediaItems = await _mediaService.GetUserMediaAsync(UserId, 0, 20);
+            Folders = await _folderService.GetUserFoldersAsync(UserId, CurrentFolderId);
+            FolderPath = await _folderService.GetFolderPathAsync(CurrentFolderId, UserId);
+            MediaItems = await _mediaService.GetUserMediaAsync(UserId, 0, 20, CurrentFolderId);
 
             return Page();
         }

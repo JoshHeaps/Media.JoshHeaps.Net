@@ -15,6 +15,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<MediaService>();
+builder.Services.AddScoped<FolderService>();
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();

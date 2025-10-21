@@ -12,6 +12,7 @@ public class UserMedia
     public int? Height { get; set; }
     public string? Description { get; set; }
     public bool IsEncrypted { get; set; } = true;
+    public long? FolderId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

@@ -17,7 +17,7 @@ public class MediaService
         _logger = logger;
     }
 
-    public async Task<UserMedia?> SaveMediaAsync(long userId, IFormFile file, string? description = null)
+    public async Task<UserMedia?> SaveMediaAsync(long userId, IFormFile file, string? description = null, long? folderId = null)
     {
         string? tempFilePath = null;
         string? encryptedFilePath = null;
@@ -71,9 +71,9 @@ public class MediaService
 
             // Insert into database
             var query = @"
-                INSERT INTO app.user_media (user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, created_at, updated_at)
-                VALUES (@userId, @fileName, @filePath, @fileSize, @mimeType, @width, @height, @description, @isEncrypted, @createdAt, @updatedAt)
-                RETURNING id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, created_at, updated_at";
+                INSERT INTO app.user_media (user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, folder_id, created_at, updated_at)
+                VALUES (@userId, @fileName, @filePath, @fileSize, @mimeType, @width, @height, @description, @isEncrypted, @folderId, @createdAt, @updatedAt)
+                RETURNING id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, folder_id, created_at, updated_at";
 
             var media = await _db.ExecuteReaderAsync(query, reader =>
             {
@@ -89,8 +89,9 @@ public class MediaService
                     Height = reader.IsDBNull(7) ? null : reader.GetInt32(7),
                     Description = reader.IsDBNull(8) ? null : reader.GetString(8),
                     IsEncrypted = reader.GetBoolean(9),
-                    CreatedAt = reader.GetDateTime(10),
-                    UpdatedAt = reader.GetDateTime(11)
+                    FolderId = reader.IsDBNull(10) ? null : reader.GetInt64(10),
+                    CreatedAt = reader.GetDateTime(11),
+                    UpdatedAt = reader.GetDateTime(12)
                 };
             }, new
             {
@@ -103,6 +104,7 @@ public class MediaService
                 height,
                 description,
                 isEncrypted = true,
+                folderId,
                 createdAt = DateTime.UtcNow,
                 updatedAt = DateTime.UtcNow
             });
@@ -127,16 +129,29 @@ public class MediaService
         }
     }
 
-    public async Task<List<UserMedia>> GetUserMediaAsync(long userId, int offset = 0, int limit = 20)
+    public async Task<List<UserMedia>> GetUserMediaAsync(long userId, int offset = 0, int limit = 20, long? folderId = null)
     {
         try
         {
-            var query = @"
-                SELECT id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, created_at, updated_at
-                FROM app.user_media
-                WHERE user_id = @userId
-                ORDER BY created_at DESC
-                OFFSET @offset LIMIT @limit";
+            string query;
+            if (folderId.HasValue)
+            {
+                query = @"
+                    SELECT id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, folder_id, created_at, updated_at
+                    FROM app.user_media
+                    WHERE user_id = @userId AND folder_id = @folderId
+                    ORDER BY created_at DESC
+                    OFFSET @offset LIMIT @limit";
+            }
+            else
+            {
+                query = @"
+                    SELECT id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, folder_id, created_at, updated_at
+                    FROM app.user_media
+                    WHERE user_id = @userId AND folder_id IS NULL
+                    ORDER BY created_at DESC
+                    OFFSET @offset LIMIT @limit";
+            }
 
             var mediaList = await _db.ExecuteListReaderAsync(query, reader =>
             {
@@ -152,10 +167,11 @@ public class MediaService
                     Height = reader.IsDBNull(7) ? null : reader.GetInt32(7),
                     Description = reader.IsDBNull(8) ? null : reader.GetString(8),
                     IsEncrypted = reader.GetBoolean(9),
-                    CreatedAt = reader.GetDateTime(10),
-                    UpdatedAt = reader.GetDateTime(11)
+                    FolderId = reader.IsDBNull(10) ? null : reader.GetInt64(10),
+                    CreatedAt = reader.GetDateTime(11),
+                    UpdatedAt = reader.GetDateTime(12)
                 };
-            }, new { userId, offset, limit });
+            }, new { userId, folderId, offset, limit });
 
             return mediaList;
         }
@@ -171,7 +187,7 @@ public class MediaService
         try
         {
             var query = @"
-                SELECT id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, created_at, updated_at
+                SELECT id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, folder_id, created_at, updated_at
                 FROM app.user_media
                 WHERE id = @mediaId AND user_id = @userId";
 
@@ -189,8 +205,9 @@ public class MediaService
                     Height = reader.IsDBNull(7) ? null : reader.GetInt32(7),
                     Description = reader.IsDBNull(8) ? null : reader.GetString(8),
                     IsEncrypted = reader.GetBoolean(9),
-                    CreatedAt = reader.GetDateTime(10),
-                    UpdatedAt = reader.GetDateTime(11)
+                    FolderId = reader.IsDBNull(10) ? null : reader.GetInt64(10),
+                    CreatedAt = reader.GetDateTime(11),
+                    UpdatedAt = reader.GetDateTime(12)
                 };
             }, new { mediaId, userId });
 
@@ -264,6 +281,32 @@ public class MediaService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to delete media {MediaId} for user {UserId}", mediaId, userId);
+            return false;
+        }
+    }
+
+    public async Task<bool> MoveMediaToFolderAsync(long mediaId, long userId, long? folderId)
+    {
+        try
+        {
+            var query = @"
+                UPDATE app.user_media
+                SET folder_id = @folderId, updated_at = @updatedAt
+                WHERE id = @mediaId AND user_id = @userId";
+
+            await _db.ExecuteAsync<object>(query, new
+            {
+                mediaId,
+                userId,
+                folderId,
+                updatedAt = DateTime.UtcNow
+            });
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to move media {MediaId} to folder {FolderId} for user {UserId}", mediaId, folderId, userId);
             return false;
         }
     }

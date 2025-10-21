@@ -57,11 +57,61 @@
     </div>
 
     <div class="card">
-        <h2>My Images (@Model.MediaItems.Count)</h2>
+        <div class="gallery-header">
+            <div class="breadcrumb-nav">
+                <a href="/">Home</a>
+                @foreach (var folder in Model.FolderPath)
+                {
+                    <span class="breadcrumb-separator">/</span>
+                    <a href="/?folderId=@folder.Id">@folder.Name</a>
+                }
+            </div>
+            <button type="button" class="btn btn-secondary" id="new-folder-btn">New Folder</button>
+        </div>
+        <h2>
+            @if (Model.CurrentFolderId.HasValue)
+            {
+                <span>@(Model.FolderPath.LastOrDefault()?.Name ?? "Folder")</span>
+            }
+            else
+            {
+                <span>My Media</span>
+            }
+            <span class="item-count">(@(Model.Folders.Count + Model.MediaItems.Count) items)</span>
+        </h2>
         <div id="gallery" class="gallery-grid">
+            @if (Model.CurrentFolderId.HasValue)
+            {
+                <div class="gallery-item folder-item" data-folder-id="back" onclick="window.location.href='/?folderId=@(Model.FolderPath.Count > 1 ? Model.FolderPath[Model.FolderPath.Count - 2].Id.ToString() : "")'">
+                    <div class="folder-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 6l6 6-6 6"/>
+                        </svg>
+                    </div>
+                    <div class="folder-name">..</div>
+                </div>
+            }
+            @foreach (var folder in Model.Folders)
+            {
+                <div class="gallery-item folder-item" data-folder-id="@folder.Id" onclick="window.location.href='/?folderId=@folder.Id'">
+                    <div class="folder-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </div>
+                    <div class="folder-name">@folder.Name</div>
+                    <div class="folder-actions">
+                        <button type="button" class="btn-action" onclick="event.stopPropagation(); renameFolder(@folder.Id, '@folder.Name')">Rename</button>
+                        <button type="button" class="btn-action" onclick="event.stopPropagation(); deleteFolder(@folder.Id)">Delete</button>
+                    </div>
+                </div>
+            }
             @foreach (var media in Model.MediaItems)
             {
-                <div class="gallery-item" data-media-id="@media.Id">
+                <div class="gallery-item media-item" data-media-id="@media.Id" draggable="true">
+                    <div class="selection-checkbox">
+                        <input type="checkbox" class="media-select" data-media-id="@media.Id" />
+                    </div>
                     <img src="/api/media/image/@media.Id" alt="@media.FileName" loading="lazy" />
                     @if (!string.IsNullOrEmpty(media.Description))
                     {
@@ -84,12 +134,31 @@
     </div>
 </div>
 
+<!-- Selection Action Bar -->
+<div id="selection-bar" class="selection-bar" style="display: none;">
+    <div class="selection-info">
+        <span id="selection-count">0 images selected</span>
+        <button type="button" class="btn btn-link" id="select-all-btn">Select All</button>
+        <button type="button" class="btn btn-link" id="deselect-all-btn">Deselect All</button>
+    </div>
+    <div class="selection-actions">
+        <button type="button" class="btn btn-primary" id="move-here-btn">Move Here</button>
+        <button type="button" class="btn btn-secondary" id="cancel-selection-btn">Cancel</button>
+    </div>
+</div>
+
 <!-- Floating Add Files Button -->
 <button type="button" class="floating-add-btn" id="add-files-btn" title="Add Files">
     <span class="btn-icon">+</span>
 </button>
 
 @section Scripts {
+    <script>
+        const currentFolderId = @(Model.CurrentFolderId?.ToString() ?? "null");
+    </script>
     <script src="~/js/gallery.js" asp-append-version="true"></script>
     <script src="~/js/upload.js" asp-append-version="true"></script>
+    <script src="~/js/folders.js" asp-append-version="true"></script>
+    <script src="~/js/drag-drop.js" asp-append-version="true"></script>
+    <script src="~/js/context-menu.js" asp-append-version="true"></script>
 }

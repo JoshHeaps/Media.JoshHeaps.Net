@@ -5,7 +5,8 @@
       "Bash(dotnet run:*)",
       "Bash(powershell:*)",
       "Bash(dotnet script:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

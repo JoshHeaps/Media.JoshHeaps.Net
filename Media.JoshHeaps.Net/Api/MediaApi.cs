@@ -9,10 +9,12 @@ namespace Media.JoshHeaps.Net.Api;
 public class MediaApi : ControllerBase
 {
     private readonly MediaService _mediaService;
+    private readonly FolderService _folderService;
 
-    public MediaApi(MediaService mediaService)
+    public MediaApi(MediaService mediaService, FolderService folderService)
     {
         _mediaService = mediaService;
+        _folderService = folderService;
     }
 
     [HttpGet("load")]
@@ -25,7 +27,7 @@ public class MediaApi : ControllerBase
             return Unauthorized();
         }
 
-        var media = await _mediaService.GetUserMediaAsync(userId.Value, offset, limit, folderId);
+        var media = await _mediaService.GetUserMediaAsync(userId.Value, offset, limit, folderId, userId.Value);
 
         return Ok(media);
     }
@@ -66,6 +68,16 @@ public class MediaApi : ControllerBase
         if (userId == null)
         {
             return Unauthorized(new { error = "Not authenticated" });
+        }
+
+        // Check folder ownership if uploading to a folder (can't upload to shared folders)
+        if (folderId.HasValue)
+        {
+            var ownerId = await _folderService.GetFolderOwnerIdAsync(folderId.Value);
+            if (ownerId != userId.Value)
+            {
+                return Forbid("Cannot upload to shared folders");
+            }
         }
 
         if (file == null || file.Length == 0)

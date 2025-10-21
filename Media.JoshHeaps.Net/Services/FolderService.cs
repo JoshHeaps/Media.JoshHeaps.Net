@@ -410,4 +410,236 @@ public class FolderService
 
         return sanitized;
     }
+
+    // Folder Sharing Methods
+
+    public async Task<FolderShare?> ShareFolderAsync(long folderId, long ownerId, long sharedWithUserId)
+    {
+        try
+        {
+            // Verify folder exists and belongs to owner
+            var folder = await GetFolderByIdAsync(folderId, ownerId);
+            if (folder == null)
+            {
+                _logger.LogWarning("Cannot share folder {FolderId} - not found or not owned by {OwnerId}", folderId, ownerId);
+                return null;
+            }
+
+            // Check if already shared
+            var existingShare = await GetFolderShareAsync(folderId, sharedWithUserId);
+            if (existingShare != null)
+            {
+                return existingShare;
+            }
+
+            var query = @"
+                INSERT INTO app.folder_shares (folder_id, owner_user_id, shared_with_user_id, permission_level, include_subfolders, created_at, updated_at)
+                VALUES (@folderId, @ownerId, @sharedWithUserId, @permissionLevel, @includeSubfolders, @createdAt, @updatedAt)
+                RETURNING id, folder_id, owner_user_id, shared_with_user_id, permission_level, include_subfolders, created_at, updated_at";
+
+            var share = await _db.ExecuteReaderAsync(query, reader =>
+            {
+                return new FolderShare
+                {
+                    Id = reader.GetInt64(0),
+                    FolderId = reader.GetInt64(1),
+                    OwnerUserId = reader.GetInt64(2),
+                    SharedWithUserId = reader.GetInt64(3),
+                    PermissionLevel = reader.GetString(4),
+                    IncludeSubfolders = reader.GetBoolean(5),
+                    CreatedAt = reader.GetDateTime(6),
+                    UpdatedAt = reader.GetDateTime(7)
+                };
+            }, new
+            {
+                folderId,
+                ownerId,
+                sharedWithUserId,
+                permissionLevel = "read_only",
+                includeSubfolders = true,
+                createdAt = DateTime.UtcNow,
+                updatedAt = DateTime.UtcNow
+            });
+
+            return share;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to share folder {FolderId} with user {SharedWithUserId}", folderId, sharedWithUserId);
+            return null;
+        }
+    }
+
+    public async Task<bool> UnshareFolderAsync(long folderId, long ownerId, long sharedWithUserId)
+    {
+        try
+        {
+            var query = @"
+                DELETE FROM app.folder_shares
+                WHERE folder_id = @folderId AND owner_user_id = @ownerId AND shared_with_user_id = @sharedWithUserId";
+
+            await _db.ExecuteAsync<object>(query, new { folderId, ownerId, sharedWithUserId });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to unshare folder {FolderId} from user {SharedWithUserId}", folderId, sharedWithUserId);
+            return false;
+        }
+    }
+
+    public async Task<List<FolderShareWithUser>> GetFolderSharesAsync(long folderId, long ownerId)
+    {
+        try
+        {
+            var query = @"
+                SELECT fs.id, fs.folder_id, fs.owner_user_id, fs.shared_with_user_id,
+                       u.username, u.email, fs.permission_level, fs.created_at
+                FROM app.folder_shares fs
+                JOIN app.users u ON fs.shared_with_user_id = u.id
+                WHERE fs.folder_id = @folderId AND fs.owner_user_id = @ownerId
+                ORDER BY u.username ASC";
+
+            var shares = await _db.ExecuteListReaderAsync(query, reader =>
+            {
+                return new FolderShareWithUser
+                {
+                    Id = reader.GetInt64(0),
+                    FolderId = reader.GetInt64(1),
+                    OwnerUserId = reader.GetInt64(2),
+                    SharedWithUserId = reader.GetInt64(3),
+                    SharedWithUsername = reader.GetString(4),
+                    SharedWithEmail = reader.GetString(5),
+                    PermissionLevel = reader.GetString(6),
+                    CreatedAt = reader.GetDateTime(7)
+                };
+            }, new { folderId, ownerId });
+
+            return shares;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get shares for folder {FolderId}", folderId);
+            return new List<FolderShareWithUser>();
+        }
+    }
+
+    public async Task<List<SharedFolderInfo>> GetSharedFoldersAsync(long userId)
+    {
+        try
+        {
+            var query = @"
+                SELECT fs.folder_id, f.name, fs.owner_user_id, u.username, fs.permission_level, fs.created_at
+                FROM app.folder_shares fs
+                JOIN app.folders f ON fs.folder_id = f.id
+                JOIN app.users u ON fs.owner_user_id = u.id
+                WHERE fs.shared_with_user_id = @userId
+                ORDER BY f.name ASC";
+
+            var sharedFolders = await _db.ExecuteListReaderAsync(query, reader =>
+            {
+                return new SharedFolderInfo
+                {
+                    FolderId = reader.GetInt64(0),
+                    FolderName = reader.GetString(1),
+                    OwnerUserId = reader.GetInt64(2),
+                    OwnerUsername = reader.GetString(3),
+                    PermissionLevel = reader.GetString(4),
+                    SharedAt = reader.GetDateTime(5)
+                };
+            }, new { userId });
+
+            return sharedFolders;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get shared folders for user {UserId}", userId);
+            return new List<SharedFolderInfo>();
+        }
+    }
+
+    private async Task<FolderShare?> GetFolderShareAsync(long folderId, long sharedWithUserId)
+    {
+        try
+        {
+            var query = @"
+                SELECT id, folder_id, owner_user_id, shared_with_user_id, permission_level, include_subfolders, created_at, updated_at
+                FROM app.folder_shares
+                WHERE folder_id = @folderId AND shared_with_user_id = @sharedWithUserId";
+
+            var share = await _db.ExecuteReaderAsync(query, reader =>
+            {
+                return new FolderShare
+                {
+                    Id = reader.GetInt64(0),
+                    FolderId = reader.GetInt64(1),
+                    OwnerUserId = reader.GetInt64(2),
+                    SharedWithUserId = reader.GetInt64(3),
+                    PermissionLevel = reader.GetString(4),
+                    IncludeSubfolders = reader.GetBoolean(5),
+                    CreatedAt = reader.GetDateTime(6),
+                    UpdatedAt = reader.GetDateTime(7)
+                };
+            }, new { folderId, sharedWithUserId });
+
+            return share;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<bool> HasFolderAccessAsync(long folderId, long userId)
+    {
+        try
+        {
+            // Check if user is the owner
+            var query = "SELECT COUNT(*) FROM app.folders WHERE id = @folderId AND user_id = @userId";
+            var isOwner = await _db.ExecuteReaderAsync(query, reader => reader.GetInt64(0), new { folderId, userId });
+            if (isOwner > 0) return true;
+
+            // Check if folder is shared with user (including parent folders due to subfolders)
+            var shareQuery = @"
+                WITH RECURSIVE folder_hierarchy AS (
+                    -- Base case: the folder itself
+                    SELECT id, parent_folder_id
+                    FROM app.folders
+                    WHERE id = @folderId
+
+                    UNION ALL
+
+                    -- Recursive case: parent folders
+                    SELECT f.id, f.parent_folder_id
+                    FROM app.folders f
+                    INNER JOIN folder_hierarchy fh ON f.id = fh.parent_folder_id
+                )
+                SELECT COUNT(*)
+                FROM app.folder_shares fs
+                INNER JOIN folder_hierarchy fh ON fs.folder_id = fh.id
+                WHERE fs.shared_with_user_id = @userId AND fs.include_subfolders = true";
+
+            var hasShare = await _db.ExecuteReaderAsync(shareQuery, reader => reader.GetInt64(0), new { folderId, userId });
+            return hasShare > 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to check folder access for folder {FolderId} and user {UserId}", folderId, userId);
+            return false;
+        }
+    }
+
+    public async Task<long?> GetFolderOwnerIdAsync(long folderId)
+    {
+        try
+        {
+            var query = "SELECT user_id FROM app.folders WHERE id = @folderId";
+            var ownerId = await _db.ExecuteReaderAsync(query, reader => reader.GetInt64(0), new { folderId });
+            return ownerId;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

@@ -102,4 +102,42 @@ public class UserService
             return false;
         }
     }
+
+    public async Task<List<UserSearchResult>> SearchUsersAsync(string query, long excludeUserId)
+    {
+        try
+        {
+            var searchQuery = @"
+                SELECT id, username, email
+                FROM app.users
+                WHERE (LOWER(username) LIKE @query OR LOWER(email) LIKE @query)
+                  AND id != @excludeUserId
+                  AND email_verified = true
+                ORDER BY username ASC
+                LIMIT 10";
+
+            var users = await _db.ExecuteListReaderAsync(searchQuery, reader =>
+            {
+                return new UserSearchResult
+                {
+                    Id = reader.GetInt64(0),
+                    Username = reader.GetString(1),
+                    Email = reader.GetString(2)
+                };
+            }, new { query = $"%{query.ToLower()}%", excludeUserId });
+
+            return users;
+        }
+        catch (Exception)
+        {
+            return new List<UserSearchResult>();
+        }
+    }
+}
+
+public class UserSearchResult
+{
+    public long Id { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
 }

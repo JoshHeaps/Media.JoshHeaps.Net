@@ -5,11 +5,8 @@ using System.Text.RegularExpressions;
 
 namespace Media.JoshHeaps.Net.Pages;
 
-public class RegisterModel : PageModel
+public class RegisterModel(AuthService authService, EmailService emailService) : PageModel
 {
-    private readonly AuthService _authService;
-    private readonly EmailService _emailService;
-
     [BindProperty]
     public string Email { get; set; } = string.Empty;
 
@@ -23,12 +20,6 @@ public class RegisterModel : PageModel
     public string ConfirmPassword { get; set; } = string.Empty;
 
     public string? ErrorMessage { get; set; }
-
-    public RegisterModel(AuthService authService, EmailService emailService)
-    {
-        _authService = authService;
-        _emailService = emailService;
-    }
 
     public void OnGet()
     {
@@ -79,7 +70,7 @@ public class RegisterModel : PageModel
         }
 
         // Register user
-        var (success, error, verificationToken) = await _authService.RegisterUserAsync(Email, Username, Password);
+        var (success, error, verificationToken) = await authService.RegisterUserAsync(Email, Username, Password);
 
         if (!success)
         {
@@ -90,7 +81,7 @@ public class RegisterModel : PageModel
         // Send verification email
         if (!string.IsNullOrEmpty(verificationToken))
         {
-            await _emailService.SendVerificationEmailAsync(Email, Username, verificationToken);
+            await emailService.SendVerificationEmailAsync(Email, Username, verificationToken);
         }
 
         // Redirect to verification pending page

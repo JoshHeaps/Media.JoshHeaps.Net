@@ -4,18 +4,11 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Media.JoshHeaps.Net.Pages;
 
-public class VerifyEmailModel : PageModel
+public class VerifyEmailModel(AuthService authService) : PageModel
 {
-    private readonly AuthService _authService;
-
     public bool Success { get; set; }
     public string Message { get; set; } = string.Empty;
     public bool ShowResendLink { get; set; }
-
-    public VerifyEmailModel(AuthService authService)
-    {
-        _authService = authService;
-    }
 
     public async Task<IActionResult> OnGetAsync([FromQuery] string? token)
     {
@@ -27,7 +20,7 @@ public class VerifyEmailModel : PageModel
             return Page();
         }
 
-        var (success, error) = await _authService.VerifyEmailAsync(token);
+        var (success, error) = await authService.VerifyEmailAsync(token);
 
         Success = success;
 

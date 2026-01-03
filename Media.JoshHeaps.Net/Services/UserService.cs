@@ -2,15 +2,8 @@ using Media.JoshHeaps.Net.Models;
 
 namespace Media.JoshHeaps.Net.Services;
 
-public class UserService
+public class UserService(DbExecutor db)
 {
-    private readonly DbExecutor _db;
-
-    public UserService(DbExecutor db)
-    {
-        _db = db;
-    }
-
     public async Task<UserDashboard?> GetUserDashboardAsync(long userId)
     {
         try
@@ -23,7 +16,7 @@ public class UserService
                 LEFT JOIN app.user_profiles p ON u.id = p.user_id
                 WHERE u.id = @userId";
 
-            var dashboard = await _db.ExecuteReaderAsync(query, reader =>
+            var dashboard = await db.ExecuteReaderAsync(query, reader =>
             {
                 return new UserDashboard
                 {
@@ -62,7 +55,7 @@ public class UserService
                 FROM app.user_profiles
                 WHERE user_id = @userId";
 
-            var profile = await _db.ExecuteReaderAsync(query, reader =>
+            var profile = await db.ExecuteReaderAsync(query, reader =>
             {
                 return new UserProfile
                 {
@@ -87,7 +80,7 @@ public class UserService
     {
         try
         {
-            await _db.ExecuteAsync<object>(
+            await db.ExecuteAsync<object>(
                 @"UPDATE app.user_profiles
                   SET bio = @bio, avatar_url = @avatarUrl, location = @location,
                       website = @website, updated_at = @updatedAt
@@ -116,7 +109,7 @@ public class UserService
                 ORDER BY username ASC
                 LIMIT 10";
 
-            var users = await _db.ExecuteListReaderAsync(searchQuery, reader =>
+            var users = await db.ExecuteListReaderAsync(searchQuery, reader =>
             {
                 return new UserSearchResult
                 {
@@ -130,7 +123,7 @@ public class UserService
         }
         catch (Exception)
         {
-            return new List<UserSearchResult>();
+            return [];
         }
     }
 }

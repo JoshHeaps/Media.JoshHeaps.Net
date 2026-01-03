@@ -6,17 +6,8 @@ namespace Media.JoshHeaps.Net.Api;
 
 [ApiController]
 [Route("api/folder-share")]
-public class FolderShareApi : ControllerBase
+public class FolderShareApi(FolderService folderService, UserService userService) : ControllerBase
 {
-    private readonly FolderService _folderService;
-    private readonly UserService _userService;
-
-    public FolderShareApi(FolderService folderService, UserService userService)
-    {
-        _folderService = folderService;
-        _userService = userService;
-    }
-
     [HttpPost("share")]
     public async Task<IActionResult> ShareFolder([FromBody] ShareFolderRequest request)
     {
@@ -26,7 +17,7 @@ public class FolderShareApi : ControllerBase
             return Unauthorized(new { error = "Not authenticated" });
         }
 
-        var share = await _folderService.ShareFolderAsync(request.FolderId, userId.Value, request.SharedWithUserId);
+        var share = await folderService.ShareFolderAsync(request.FolderId, userId.Value, request.SharedWithUserId);
         if (share == null)
         {
             return BadRequest(new { error = "Failed to share folder" });
@@ -44,7 +35,7 @@ public class FolderShareApi : ControllerBase
             return Unauthorized(new { error = "Not authenticated" });
         }
 
-        var success = await _folderService.UnshareFolderAsync(folderId, userId.Value, sharedWithUserId);
+        var success = await folderService.UnshareFolderAsync(folderId, userId.Value, sharedWithUserId);
         if (!success)
         {
             return BadRequest(new { error = "Failed to unshare folder" });
@@ -62,7 +53,7 @@ public class FolderShareApi : ControllerBase
             return Unauthorized(new { error = "Not authenticated" });
         }
 
-        var shares = await _folderService.GetFolderSharesAsync(folderId, userId.Value);
+        var shares = await folderService.GetFolderSharesAsync(folderId, userId.Value);
         return Ok(shares);
     }
 
@@ -75,7 +66,7 @@ public class FolderShareApi : ControllerBase
             return Unauthorized(new { error = "Not authenticated" });
         }
 
-        var sharedFolders = await _folderService.GetSharedFoldersAsync(userId.Value);
+        var sharedFolders = await folderService.GetSharedFoldersAsync(userId.Value);
         return Ok(sharedFolders);
     }
 
@@ -93,7 +84,7 @@ public class FolderShareApi : ControllerBase
             return Ok(new List<object>());
         }
 
-        var users = await _userService.SearchUsersAsync(query, userId.Value);
+        var users = await userService.SearchUsersAsync(query, userId.Value);
         return Ok(users);
     }
 

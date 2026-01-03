@@ -103,4 +103,20 @@ public class DbExecutor(IConfiguration config)
 
         return results;
     }
+
+    // Executes a non-query command (INSERT, UPDATE, DELETE) and returns rows affected
+    public async Task<int> ExecuteNonQueryAsync(string query, object? parameters = null)
+    {
+        parameters ??= new();
+        using var conn = new NpgsqlConnection(ConnectionString);
+        await conn.OpenAsync();
+        using var cmd = new NpgsqlCommand(query, conn);
+
+        foreach (var prop in parameters.GetType().GetProperties())
+        {
+            cmd.Parameters.AddWithValue($"@{prop.Name}", prop.GetValue(parameters) ?? DBNull.Value);
+        }
+
+        return await cmd.ExecuteNonQueryAsync();
+    }
 }

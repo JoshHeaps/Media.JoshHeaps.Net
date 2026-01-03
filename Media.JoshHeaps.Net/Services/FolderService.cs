@@ -2,17 +2,8 @@ using Media.JoshHeaps.Net.Models;
 
 namespace Media.JoshHeaps.Net.Services;
 
-public class FolderService
+public class FolderService(DbExecutor db, ILogger<FolderService> logger)
 {
-    private readonly DbExecutor _db;
-    private readonly ILogger<FolderService> _logger;
-
-    public FolderService(DbExecutor db, ILogger<FolderService> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
-
     public async Task<Folder?> CreateFolderAsync(long userId, string name, long? parentFolderId = null)
     {
         try
@@ -20,7 +11,7 @@ public class FolderService
             // Validate folder name
             if (string.IsNullOrWhiteSpace(name))
             {
-                _logger.LogWarning("Cannot create folder with empty name for user {UserId}", userId);
+                logger.LogWarning("Cannot create folder with empty name for user {UserId}", userId);
                 return null;
             }
 
@@ -28,7 +19,7 @@ public class FolderService
             var sanitizedName = SanitizeFolderName(name);
             if (string.IsNullOrWhiteSpace(sanitizedName))
             {
-                _logger.LogWarning("Folder name became empty after sanitization for user {UserId}", userId);
+                logger.LogWarning("Folder name became empty after sanitization for user {UserId}", userId);
                 return null;
             }
 
@@ -38,7 +29,7 @@ public class FolderService
                 var parentExists = await FolderExistsAsync(parentFolderId.Value, userId);
                 if (!parentExists)
                 {
-                    _logger.LogWarning("Parent folder {ParentFolderId} not found for user {UserId}", parentFolderId.Value, userId);
+                    logger.LogWarning("Parent folder {ParentFolderId} not found for user {UserId}", parentFolderId.Value, userId);
                     return null;
                 }
             }
@@ -48,7 +39,7 @@ public class FolderService
                 VALUES (@userId, @name, @parentFolderId, @createdAt, @updatedAt)
                 RETURNING id, user_id, name, parent_folder_id, created_at, updated_at";
 
-            var folder = await _db.ExecuteReaderAsync(query, reader =>
+            var folder = await db.ExecuteReaderAsync(query, reader =>
             {
                 return new Folder
                 {
@@ -72,7 +63,7 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create folder '{Name}' for user {UserId}", name, userId);
+            logger.LogError(ex, "Failed to create folder '{Name}' for user {UserId}", name, userId);
             return null;
         }
     }
@@ -99,7 +90,7 @@ public class FolderService
                     ORDER BY name ASC";
             }
 
-            var folders = await _db.ExecuteListReaderAsync(query, reader =>
+            var folders = await db.ExecuteListReaderAsync(query, reader =>
             {
                 return new Folder
                 {
@@ -116,8 +107,8 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get folders for user {UserId}, parent {ParentFolderId}", userId, parentFolderId);
-            return new List<Folder>();
+            logger.LogError(ex, "Failed to get folders for user {UserId}, parent {ParentFolderId}", userId, parentFolderId);
+            return [];
         }
     }
 
@@ -130,7 +121,7 @@ public class FolderService
                 FROM app.folders
                 WHERE id = @folderId AND user_id = @userId";
 
-            var folder = await _db.ExecuteReaderAsync(query, reader =>
+            var folder = await db.ExecuteReaderAsync(query, reader =>
             {
                 return new Folder
                 {
@@ -147,7 +138,7 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get folder {FolderId} for user {UserId}", folderId, userId);
+            logger.LogError(ex, "Failed to get folder {FolderId} for user {UserId}", folderId, userId);
             return null;
         }
     }
@@ -159,7 +150,7 @@ public class FolderService
             var sanitizedName = SanitizeFolderName(newName);
             if (string.IsNullOrWhiteSpace(sanitizedName))
             {
-                _logger.LogWarning("Cannot rename folder to empty name");
+                logger.LogWarning("Cannot rename folder to empty name");
                 return false;
             }
 
@@ -168,7 +159,7 @@ public class FolderService
                 SET name = @newName, updated_at = @updatedAt
                 WHERE id = @folderId AND user_id = @userId";
 
-            await _db.ExecuteAsync<object>(query, new
+            await db.ExecuteAsync<object>(query, new
             {
                 folderId,
                 userId,
@@ -180,7 +171,7 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to rename folder {FolderId} for user {UserId}", folderId, userId);
+            logger.LogError(ex, "Failed to rename folder {FolderId} for user {UserId}", folderId, userId);
             return false;
         }
     }
@@ -193,12 +184,12 @@ public class FolderService
             var hasSubfoldersQuery = "SELECT COUNT(*) FROM app.folders WHERE parent_folder_id = @folderId";
             var hasMediaQuery = "SELECT COUNT(*) FROM app.user_media WHERE folder_id = @folderId";
 
-            var subfolderCount = await _db.ExecuteReaderAsync(hasSubfoldersQuery, reader => reader.GetInt64(0), new { folderId });
-            var mediaCount = await _db.ExecuteReaderAsync(hasMediaQuery, reader => reader.GetInt64(0), new { folderId });
+            var subfolderCount = await db.ExecuteReaderAsync(hasSubfoldersQuery, reader => reader.GetInt64(0), new { folderId });
+            var mediaCount = await db.ExecuteReaderAsync(hasMediaQuery, reader => reader.GetInt64(0), new { folderId });
 
             if (!deleteContents && (subfolderCount > 0 || mediaCount > 0))
             {
-                _logger.LogWarning("Cannot delete folder {FolderId} - it contains items", folderId);
+                logger.LogWarning("Cannot delete folder {FolderId} - it contains items", folderId);
                 return false;
             }
 
@@ -214,7 +205,7 @@ public class FolderService
                         SET parent_folder_id = @parentFolderId, updated_at = @updatedAt
                         WHERE parent_folder_id = @folderId AND user_id = @userId";
 
-                    await _db.ExecuteAsync<object>(moveSubfoldersQuery, new
+                    await db.ExecuteAsync<object>(moveSubfoldersQuery, new
                     {
                         parentFolderId = folder.ParentFolderId,
                         folderId,
@@ -228,7 +219,7 @@ public class FolderService
                         SET folder_id = @parentFolderId, updated_at = @updatedAt
                         WHERE folder_id = @folderId AND user_id = @userId";
 
-                    await _db.ExecuteAsync<object>(moveMediaQuery, new
+                    await db.ExecuteAsync<object>(moveMediaQuery, new
                     {
                         parentFolderId = folder.ParentFolderId,
                         folderId,
@@ -240,13 +231,13 @@ public class FolderService
 
             // Delete the folder
             var deleteQuery = "DELETE FROM app.folders WHERE id = @folderId AND user_id = @userId";
-            await _db.ExecuteAsync<object>(deleteQuery, new { folderId, userId });
+            await db.ExecuteAsync<object>(deleteQuery, new { folderId, userId });
 
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to delete folder {FolderId} for user {UserId}", folderId, userId);
+            logger.LogError(ex, "Failed to delete folder {FolderId} for user {UserId}", folderId, userId);
             return false;
         }
     }
@@ -275,7 +266,7 @@ public class FolderService
                 var isDescendant = await IsFolderDescendantAsync(newParentFolderId.Value, folderId);
                 if (isDescendant)
                 {
-                    _logger.LogWarning("Cannot move folder {FolderId} into its descendant {ParentFolderId}", folderId, newParentFolderId.Value);
+                    logger.LogWarning("Cannot move folder {FolderId} into its descendant {ParentFolderId}", folderId, newParentFolderId.Value);
                     return false;
                 }
             }
@@ -285,7 +276,7 @@ public class FolderService
                 SET parent_folder_id = @newParentFolderId, updated_at = @updatedAt
                 WHERE id = @folderId AND user_id = @userId";
 
-            await _db.ExecuteAsync<object>(query, new
+            await db.ExecuteAsync<object>(query, new
             {
                 folderId,
                 userId,
@@ -297,7 +288,7 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to move folder {FolderId} for user {UserId}", folderId, userId);
+            logger.LogError(ex, "Failed to move folder {FolderId} for user {UserId}", folderId, userId);
             return false;
         }
     }
@@ -330,8 +321,8 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get folder path for folder {FolderId}", folderId);
-            return new List<Folder>();
+            logger.LogError(ex, "Failed to get folder path for folder {FolderId}", folderId);
+            return [];
         }
     }
 
@@ -340,7 +331,7 @@ public class FolderService
         try
         {
             var query = "SELECT COUNT(*) FROM app.folders WHERE id = @folderId AND user_id = @userId";
-            var count = await _db.ExecuteReaderAsync(query, reader => reader.GetInt64(0), new { folderId, userId });
+            var count = await db.ExecuteReaderAsync(query, reader => reader.GetInt64(0), new { folderId, userId });
             return count > 0;
         }
         catch
@@ -371,7 +362,7 @@ public class FolderService
                 visited.Add(currentId);
 
                 var query = "SELECT parent_folder_id FROM app.folders WHERE id = @folderId";
-                var parentId = await _db.ExecuteReaderAsync(query, reader => reader.IsDBNull(0) ? (long?)null : reader.GetInt64(0), new { folderId = currentId });
+                var parentId = await db.ExecuteReaderAsync(query, reader => reader.IsDBNull(0) ? (long?)null : reader.GetInt64(0), new { folderId = currentId });
 
                 if (!parentId.HasValue)
                 {
@@ -385,7 +376,7 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to check if folder {PotentialDescendantId} is descendant of {AncestorId}", potentialDescendantId, ancestorId);
+            logger.LogError(ex, "Failed to check if folder {PotentialDescendantId} is descendant of {AncestorId}", potentialDescendantId, ancestorId);
             return false;
         }
     }
@@ -421,7 +412,7 @@ public class FolderService
             var folder = await GetFolderByIdAsync(folderId, ownerId);
             if (folder == null)
             {
-                _logger.LogWarning("Cannot share folder {FolderId} - not found or not owned by {OwnerId}", folderId, ownerId);
+                logger.LogWarning("Cannot share folder {FolderId} - not found or not owned by {OwnerId}", folderId, ownerId);
                 return null;
             }
 
@@ -437,7 +428,7 @@ public class FolderService
                 VALUES (@folderId, @ownerId, @sharedWithUserId, @permissionLevel, @includeSubfolders, @createdAt, @updatedAt)
                 RETURNING id, folder_id, owner_user_id, shared_with_user_id, permission_level, include_subfolders, created_at, updated_at";
 
-            var share = await _db.ExecuteReaderAsync(query, reader =>
+            var share = await db.ExecuteReaderAsync(query, reader =>
             {
                 return new FolderShare
                 {
@@ -465,7 +456,7 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to share folder {FolderId} with user {SharedWithUserId}", folderId, sharedWithUserId);
+            logger.LogError(ex, "Failed to share folder {FolderId} with user {SharedWithUserId}", folderId, sharedWithUserId);
             return null;
         }
     }
@@ -478,12 +469,12 @@ public class FolderService
                 DELETE FROM app.folder_shares
                 WHERE folder_id = @folderId AND owner_user_id = @ownerId AND shared_with_user_id = @sharedWithUserId";
 
-            await _db.ExecuteAsync<object>(query, new { folderId, ownerId, sharedWithUserId });
+            await db.ExecuteAsync<object>(query, new { folderId, ownerId, sharedWithUserId });
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to unshare folder {FolderId} from user {SharedWithUserId}", folderId, sharedWithUserId);
+            logger.LogError(ex, "Failed to unshare folder {FolderId} from user {SharedWithUserId}", folderId, sharedWithUserId);
             return false;
         }
     }
@@ -500,7 +491,7 @@ public class FolderService
                 WHERE fs.folder_id = @folderId AND fs.owner_user_id = @ownerId
                 ORDER BY u.username ASC";
 
-            var shares = await _db.ExecuteListReaderAsync(query, reader =>
+            var shares = await db.ExecuteListReaderAsync(query, reader =>
             {
                 return new FolderShareWithUser
                 {
@@ -519,8 +510,8 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get shares for folder {FolderId}", folderId);
-            return new List<FolderShareWithUser>();
+            logger.LogError(ex, "Failed to get shares for folder {FolderId}", folderId);
+            return [];
         }
     }
 
@@ -536,7 +527,7 @@ public class FolderService
                 WHERE fs.shared_with_user_id = @userId
                 ORDER BY f.name ASC";
 
-            var sharedFolders = await _db.ExecuteListReaderAsync(query, reader =>
+            var sharedFolders = await db.ExecuteListReaderAsync(query, reader =>
             {
                 return new SharedFolderInfo
                 {
@@ -553,8 +544,8 @@ public class FolderService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get shared folders for user {UserId}", userId);
-            return new List<SharedFolderInfo>();
+            logger.LogError(ex, "Failed to get shared folders for user {UserId}", userId);
+            return [];
         }
     }
 
@@ -567,7 +558,7 @@ public class FolderService
                 FROM app.folder_shares
                 WHERE folder_id = @folderId AND shared_with_user_id = @sharedWithUserId";
 
-            var share = await _db.ExecuteReaderAsync(query, reader =>
+            var share = await db.ExecuteReaderAsync(query, reader =>
             {
                 return new FolderShare
                 {
@@ -596,7 +587,7 @@ public class FolderService
         {
             // Check if user is the owner
             var query = "SELECT COUNT(*) FROM app.folders WHERE id = @folderId AND user_id = @userId";
-            var isOwner = await _db.ExecuteReaderAsync(query, reader => reader.GetInt64(0), new { folderId, userId });
+            var isOwner = await db.ExecuteReaderAsync(query, reader => reader.GetInt64(0), new { folderId, userId });
             if (isOwner > 0) return true;
 
             // Check if folder is shared with user (including parent folders due to subfolders)
@@ -619,12 +610,12 @@ public class FolderService
                 INNER JOIN folder_hierarchy fh ON fs.folder_id = fh.id
                 WHERE fs.shared_with_user_id = @userId AND fs.include_subfolders = true";
 
-            var hasShare = await _db.ExecuteReaderAsync(shareQuery, reader => reader.GetInt64(0), new { folderId, userId });
+            var hasShare = await db.ExecuteReaderAsync(shareQuery, reader => reader.GetInt64(0), new { folderId, userId });
             return hasShare > 0;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to check folder access for folder {FolderId} and user {UserId}", folderId, userId);
+            logger.LogError(ex, "Failed to check folder access for folder {FolderId} and user {UserId}", folderId, userId);
             return false;
         }
     }
@@ -634,7 +625,7 @@ public class FolderService
         try
         {
             var query = "SELECT user_id FROM app.folders WHERE id = @folderId";
-            var ownerId = await _db.ExecuteReaderAsync(query, reader => reader.GetInt64(0), new { folderId });
+            var ownerId = await db.ExecuteReaderAsync(query, reader => reader.GetInt64(0), new { folderId });
             return ownerId;
         }
         catch

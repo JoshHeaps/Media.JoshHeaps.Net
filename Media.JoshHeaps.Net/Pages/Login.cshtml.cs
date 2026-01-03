@@ -5,10 +5,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Media.JoshHeaps.Net.Pages;
 
-public class LoginModel : PageModel
+public class LoginModel(AuthService authService) : PageModel
 {
-    private readonly AuthService _authService;
-
     [BindProperty]
     public string Email { get; set; } = string.Empty;
 
@@ -22,18 +20,13 @@ public class LoginModel : PageModel
     public string? SuccessMessage { get; set; }
     public string? WarningMessage { get; set; }
 
-    public LoginModel(AuthService authService)
-    {
-        _authService = authService;
-    }
-
     public void OnGet([FromQuery] string? registered, [FromQuery] string? verified)
     {
         // Check if user is already logged in
         var userId = HttpContext.Session.GetString("UserId");
         if (!string.IsNullOrEmpty(userId))
         {
-            Response.Redirect("/");
+            Response.Redirect("/Landing");
             return;
         }
 
@@ -58,7 +51,7 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        var (success, error, userInfo) = await _authService.LoginAsync(Email, Password);
+        var (success, error, userInfo) = await authService.LoginAsync(Email, Password);
 
         if (!success || userInfo == null)
         {
@@ -91,6 +84,6 @@ public class LoginModel : PageModel
             Response.Cookies.Append("RememberMe", userInfo.Id.ToString(), cookieOptions);
         }
 
-        return Redirect("/");
+        return Redirect("/Landing");
     }
 }

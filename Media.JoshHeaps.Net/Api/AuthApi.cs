@@ -11,17 +11,8 @@ namespace Media.JoshHeaps.Net.Api;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthApi : ControllerBase
+public class AuthApi(AuthService authService, IConfiguration configuration) : ControllerBase
 {
-    private readonly AuthService _authService;
-    private readonly IConfiguration _configuration;
-
-    public AuthApi(AuthService authService, IConfiguration configuration)
-    {
-        _authService = authService;
-        _configuration = configuration;
-    }
-
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -30,7 +21,7 @@ public class AuthApi : ControllerBase
             return BadRequest(new { error = "Email/username and password are required" });
         }
 
-        var (success, error, userInfo) = await _authService.LoginAsync(request.EmailOrUsername, request.Password);
+        var (success, error, userInfo) = await authService.LoginAsync(request.EmailOrUsername, request.Password);
 
         if (!success || userInfo == null)
         {
@@ -77,10 +68,10 @@ public class AuthApi : ControllerBase
 
     private string GenerateJwtToken(UserLoginInfo user)
     {
-        var jwtKey = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
-        var jwtIssuer = _configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT Issuer not configured");
-        var jwtAudience = _configuration["Jwt:Audience"] ?? throw new InvalidOperationException("JWT Audience not configured");
-        var jwtExpiryDays = int.Parse(_configuration["Jwt:ExpiryInDays"] ?? "30");
+        var jwtKey = configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
+        var jwtIssuer = configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT Issuer not configured");
+        var jwtAudience = configuration["Jwt:Audience"] ?? throw new InvalidOperationException("JWT Audience not configured");
+        var jwtExpiryDays = int.Parse(configuration["Jwt:ExpiryInDays"] ?? "30");
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);

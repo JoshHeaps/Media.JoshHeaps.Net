@@ -6,7 +6,11 @@
       "Bash(powershell:*)",
       "Bash(dotnet script:*)",
       "Bash(taskkill:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(cd:*)",
+      "Bash(tree:*)",
+      "Bash(del Index.cshtml Index.cshtml.cs)",
+      "Bash(dotnet build:*)"
     ],
     "deny": [],
     "ask": []

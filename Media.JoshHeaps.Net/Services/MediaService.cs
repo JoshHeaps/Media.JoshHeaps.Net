@@ -2,23 +2,8 @@ using Media.JoshHeaps.Net.Models;
 
 namespace Media.JoshHeaps.Net.Services;
 
-public class MediaService
+public class MediaService(DbExecutor db, IWebHostEnvironment environment, EncryptionService encryption, ILogger<MediaService> logger, FolderService folderService)
 {
-    private readonly DbExecutor _db;
-    private readonly IWebHostEnvironment _environment;
-    private readonly EncryptionService _encryption;
-    private readonly ILogger<MediaService> _logger;
-    private readonly FolderService _folderService;
-
-    public MediaService(DbExecutor db, IWebHostEnvironment environment, EncryptionService encryption, ILogger<MediaService> logger, FolderService folderService)
-    {
-        _db = db;
-        _environment = environment;
-        _encryption = encryption;
-        _logger = logger;
-        _folderService = folderService;
-    }
-
     public async Task<UserMedia?> SaveMediaAsync(long userId, IFormFile file, string? description = null, long? folderId = null)
     {
         string? tempFilePath = null;
@@ -31,7 +16,7 @@ public class MediaService
             var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}.enc"; // .enc for encrypted
 
             // Store outside wwwroot in App_Data folder
-            var mediaFolder = Path.Combine(_environment.ContentRootPath, "App_Data", "media", userId.ToString());
+            var mediaFolder = Path.Combine(environment.ContentRootPath, "App_Data", "media", userId.ToString());
             Directory.CreateDirectory(mediaFolder);
 
             tempFilePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -57,12 +42,12 @@ public class MediaService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to read image dimensions for {FileName}", file.FileName);
+                    logger.LogWarning(ex, "Failed to read image dimensions for {FileName}", file.FileName);
                 }
             }
 
             // Encrypt and save
-            await _encryption.EncryptFileAsync(tempFilePath, encryptedFilePath);
+            await encryption.EncryptFileAsync(tempFilePath, encryptedFilePath);
 
             // Delete temp file
             File.Delete(tempFilePath);
@@ -77,7 +62,7 @@ public class MediaService
                 VALUES (@userId, @fileName, @filePath, @fileSize, @mimeType, @width, @height, @description, @isEncrypted, @folderId, @createdAt, @updatedAt)
                 RETURNING id, user_id, file_name, file_path, file_size, mime_type, width, height, description, is_encrypted, folder_id, created_at, updated_at";
 
-            var media = await _db.ExecuteReaderAsync(query, reader =>
+            var media = await db.ExecuteReaderAsync(query, reader =>
             {
                 return new UserMedia
                 {
@@ -115,7 +100,7 @@ public class MediaService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to save media for user {UserId}", userId);
+            logger.LogError(ex, "Failed to save media for user {UserId}", userId);
 
             // Cleanup on error
             if (tempFilePath != null && File.Exists(tempFilePath))
@@ -139,14 +124,14 @@ public class MediaService
             var effectiveUserId = userId;
             if (requestingUserId.HasValue && folderId.HasValue)
             {
-                var hasAccess = await _folderService.HasFolderAccessAsync(folderId.Value, requestingUserId.Value);
+                var hasAccess = await folderService.HasFolderAccessAsync(folderId.Value, requestingUserId.Value);
                 if (!hasAccess)
                 {
-                    _logger.LogWarning("User {RequestingUserId} does not have access to folder {FolderId}", requestingUserId.Value, folderId.Value);
-                    return new List<UserMedia>();
+                    logger.LogWarning("User {RequestingUserId} does not have access to folder {FolderId}", requestingUserId.Value, folderId.Value);
+                    return [];
                 }
                 // Get the actual owner of the folder
-                var ownerId = await _folderService.GetFolderOwnerIdAsync(folderId.Value);
+                var ownerId = await folderService.GetFolderOwnerIdAsync(folderId.Value);
                 if (ownerId.HasValue)
                 {
                     effectiveUserId = ownerId.Value;
@@ -173,7 +158,7 @@ public class MediaService
                     OFFSET @offset LIMIT @limit";
             }
 
-            var mediaList = await _db.ExecuteListReaderAsync(query, reader =>
+            var mediaList = await db.ExecuteListReaderAsync(query, reader =>
             {
                 return new UserMedia
                 {
@@ -197,8 +182,8 @@ public class MediaService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get media for user {UserId}", userId);
-            return new List<UserMedia>();
+            logger.LogError(ex, "Failed to get media for user {UserId}", userId);
+            return [];
         }
     }
 
@@ -212,7 +197,7 @@ public class MediaService
                 FROM app.user_media
                 WHERE id = @mediaId";
 
-            var media = await _db.ExecuteReaderAsync(query, reader =>
+            var media = await db.ExecuteReaderAsync(query, reader =>
             {
                 return new UserMedia
                 {
@@ -244,7 +229,7 @@ public class MediaService
             }
 
             // Check if user has access via shared folder
-            if (media.FolderId.HasValue && await _folderService.HasFolderAccessAsync(media.FolderId.Value, userId))
+            if (media.FolderId.HasValue && await folderService.HasFolderAccessAsync(media.FolderId.Value, userId))
             {
                 return media;
             }
@@ -254,7 +239,7 @@ public class MediaService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get media {MediaId} for user {UserId}", mediaId, userId);
+            logger.LogError(ex, "Failed to get media {MediaId} for user {UserId}", mediaId, userId);
             return null;
         }
     }
@@ -266,21 +251,21 @@ public class MediaService
             var media = await GetMediaByIdAsync(mediaId, userId);
             if (media == null)
             {
-                _logger.LogWarning("Media {MediaId} not found or user {UserId} doesn't have access", mediaId, userId);
+                logger.LogWarning("Media {MediaId} not found or user {UserId} doesn't have access", mediaId, userId);
                 return null;
             }
 
-            var fullPath = Path.Combine(_environment.ContentRootPath, media.FilePath);
+            var fullPath = Path.Combine(environment.ContentRootPath, media.FilePath);
 
             if (!File.Exists(fullPath))
             {
-                _logger.LogError("Media file not found at {FilePath}", fullPath);
+                logger.LogError("Media file not found at {FilePath}", fullPath);
                 return null;
             }
 
             if (media.IsEncrypted)
             {
-                return await _encryption.DecryptFileAsync(fullPath);
+                return await encryption.DecryptFileAsync(fullPath);
             }
             else
             {
@@ -289,7 +274,7 @@ public class MediaService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get decrypted media data for {MediaId}", mediaId);
+            logger.LogError(ex, "Failed to get decrypted media data for {MediaId}", mediaId);
             return null;
         }
     }
@@ -300,16 +285,16 @@ public class MediaService
         {
             // Get media info first
             var query = "SELECT file_path FROM app.user_media WHERE id = @mediaId AND user_id = @userId";
-            var filePath = await _db.ExecuteReaderAsync(query, reader => reader.GetString(0), new { mediaId, userId });
+            var filePath = await db.ExecuteReaderAsync(query, reader => reader.GetString(0), new { mediaId, userId });
 
             if (filePath == null) return false;
 
             // Delete from database
             var deleteQuery = "DELETE FROM app.user_media WHERE id = @mediaId AND user_id = @userId";
-            await _db.ExecuteAsync<object>(deleteQuery, new { mediaId, userId });
+            await db.ExecuteAsync<object>(deleteQuery, new { mediaId, userId });
 
             // Delete physical file
-            var physicalPath = Path.Combine(_environment.ContentRootPath, filePath);
+            var physicalPath = Path.Combine(environment.ContentRootPath, filePath);
             if (File.Exists(physicalPath))
             {
                 File.Delete(physicalPath);
@@ -319,7 +304,7 @@ public class MediaService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to delete media {MediaId} for user {UserId}", mediaId, userId);
+            logger.LogError(ex, "Failed to delete media {MediaId} for user {UserId}", mediaId, userId);
             return false;
         }
     }
@@ -333,7 +318,7 @@ public class MediaService
                 SET folder_id = @folderId, updated_at = @updatedAt
                 WHERE id = @mediaId AND user_id = @userId";
 
-            await _db.ExecuteAsync<object>(query, new
+            await db.ExecuteAsync<object>(query, new
             {
                 mediaId,
                 userId,
@@ -345,7 +330,7 @@ public class MediaService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to move media {MediaId} to folder {FolderId} for user {UserId}", mediaId, folderId, userId);
+            logger.LogError(ex, "Failed to move media {MediaId} to folder {FolderId} for user {UserId}", mediaId, folderId, userId);
             return false;
         }
     }

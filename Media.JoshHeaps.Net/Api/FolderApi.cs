@@ -6,15 +6,8 @@ namespace Media.JoshHeaps.Net.Api;
 
 [ApiController]
 [Route("api/folder")]
-public class FolderApi : ControllerBase
+public class FolderApi(FolderService folderService) : ControllerBase
 {
-    private readonly FolderService _folderService;
-
-    public FolderApi(FolderService folderService)
-    {
-        _folderService = folderService;
-    }
-
     [HttpGet("list")]
     public async Task<IActionResult> ListFolders([FromQuery] long? folderId = null)
     {
@@ -24,7 +17,7 @@ public class FolderApi : ControllerBase
             return Unauthorized(new { error = "Not authenticated" });
         }
 
-        var folders = await _folderService.GetUserFoldersAsync(userId.Value, folderId);
+        var folders = await folderService.GetUserFoldersAsync(userId.Value, folderId);
         return Ok(folders);
     }
 
@@ -37,7 +30,7 @@ public class FolderApi : ControllerBase
             return Unauthorized(new { error = "Not authenticated" });
         }
 
-        var path = await _folderService.GetFolderPathAsync(folderId, userId.Value);
+        var path = await folderService.GetFolderPathAsync(folderId, userId.Value);
         return Ok(path);
     }
 
@@ -58,14 +51,14 @@ public class FolderApi : ControllerBase
         // If parent folder specified, check ownership (can't create in shared folders)
         if (request.ParentFolderId.HasValue)
         {
-            var parentOwnerId = await _folderService.GetFolderOwnerIdAsync(request.ParentFolderId.Value);
+            var parentOwnerId = await folderService.GetFolderOwnerIdAsync(request.ParentFolderId.Value);
             if (parentOwnerId != userId.Value)
             {
                 return Forbid("Cannot create folders in shared folders");
             }
         }
 
-        var folder = await _folderService.CreateFolderAsync(userId.Value, request.Name, request.ParentFolderId);
+        var folder = await folderService.CreateFolderAsync(userId.Value, request.Name, request.ParentFolderId);
         if (folder == null)
         {
             return BadRequest(new { error = "Failed to create folder" });
@@ -89,13 +82,13 @@ public class FolderApi : ControllerBase
         }
 
         // Check ownership (can't rename shared folders)
-        var ownerId = await _folderService.GetFolderOwnerIdAsync(request.FolderId);
+        var ownerId = await folderService.GetFolderOwnerIdAsync(request.FolderId);
         if (ownerId != userId.Value)
         {
             return Forbid("Cannot rename shared folders");
         }
 
-        var success = await _folderService.RenameFolderAsync(request.FolderId, userId.Value, request.NewName);
+        var success = await folderService.RenameFolderAsync(request.FolderId, userId.Value, request.NewName);
         if (!success)
         {
             return BadRequest(new { error = "Failed to rename folder" });
@@ -114,13 +107,13 @@ public class FolderApi : ControllerBase
         }
 
         // Check ownership (can't delete shared folders)
-        var ownerId = await _folderService.GetFolderOwnerIdAsync(folderId);
+        var ownerId = await folderService.GetFolderOwnerIdAsync(folderId);
         if (ownerId != userId.Value)
         {
             return Forbid("Cannot delete shared folders");
         }
 
-        var success = await _folderService.DeleteFolderAsync(folderId, userId.Value, deleteContents);
+        var success = await folderService.DeleteFolderAsync(folderId, userId.Value, deleteContents);
         if (!success)
         {
             return BadRequest(new { error = "Failed to delete folder" });
@@ -139,13 +132,13 @@ public class FolderApi : ControllerBase
         }
 
         // Check ownership (can't move shared folders)
-        var ownerId = await _folderService.GetFolderOwnerIdAsync(request.FolderId);
+        var ownerId = await folderService.GetFolderOwnerIdAsync(request.FolderId);
         if (ownerId != userId.Value)
         {
             return Forbid("Cannot move shared folders");
         }
 
-        var success = await _folderService.MoveFolderAsync(request.FolderId, userId.Value, request.NewParentFolderId);
+        var success = await folderService.MoveFolderAsync(request.FolderId, userId.Value, request.NewParentFolderId);
         if (!success)
         {
             return BadRequest(new { error = "Failed to move folder" });

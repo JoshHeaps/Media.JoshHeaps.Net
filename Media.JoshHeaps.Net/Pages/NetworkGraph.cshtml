@@ -1,0 +1,275 @@
+@page
+@model Media.JoshHeaps.Net.Pages.NetworkGraphModel
+@{
+    ViewData["Title"] = "Network Graphs";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/Gallery/page.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/network-graph.css" asp-append-version="true" />
+}
+
+<div class="dashboard-container">
+    <!-- Header Section -->
+    <div class="welcome-section">
+        <div class="welcome-left">
+            <a href="/Landing" class="back-button" title="Back to Home">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </a>
+            <h1>Network Graphs</h1>
+        </div>
+        <div class="quick-actions">
+            <button type="button" class="btn btn-primary" id="new-graph-btn">New Graph</button>
+            <a href="/Profile" class="btn btn-secondary">Profile</a>
+            <a href="/Logout" class="btn btn-danger">Logout</a>
+        </div>
+    </div>
+
+    <!-- Graph Selection & Management -->
+    <div class="graph-manager-section">
+        <div class="graph-selector-card card">
+            <h2>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
+                    <path d="M3 3v18h18"></path>
+                    <path d="M18 17V9"></path>
+                    <path d="M13 17V5"></path>
+                    <path d="M8 17v-3"></path>
+                </svg>
+                Your Graphs
+            </h2>
+            <div class="graphs-list" id="graphs-list">
+                @if (Model.Graphs.Count == 0)
+                {
+                    <div class="empty-state">
+                        <p>No graphs yet. Create your first graph to get started!</p>
+                    </div>
+                }
+                else
+                {
+                    foreach (var graph in Model.Graphs)
+                    {
+                        <div class="graph-item @(graph.Id == Model.SelectedGraphId ? "active" : "")" data-graph-id="@graph.Id">
+                            <div class="graph-info" onclick="selectGraph(@graph.Id)">
+                                <div class="graph-name">@graph.Name</div>
+                                <div class="graph-stats">
+                                    <span class="stat">@graph.NodeCount nodes</span>
+                                    <span class="stat">@graph.EdgeCount edges</span>
+                                </div>
+                            </div>
+                            <div class="graph-actions">
+                                <button type="button" class="btn-icon" onclick="event.stopPropagation(); editGraph(@graph.Id, '@graph.Name', '@(graph.Description ?? "")')" title="Edit">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                </button>
+                                <button type="button" class="btn-icon" onclick="event.stopPropagation(); cloneGraph(@graph.Id, '@graph.Name')" title="Clone">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                </button>
+                                <button type="button" class="btn-icon danger" onclick="event.stopPropagation(); deleteGraph(@graph.Id, '@graph.Name')" title="Delete">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Graph Visualization & Tools -->
+    <div class="graph-workspace" id="graph-workspace" style="display: none;">
+        <!-- Toolbar -->
+        <div class="graph-toolbar card">
+            <div class="toolbar-section">
+                <button type="button" class="btn btn-secondary" id="add-node-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    Add Node
+                </button>
+                <button type="button" class="btn btn-secondary" id="link-nodes-btn" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                    Link Selected
+                </button>
+            </div>
+            <div class="toolbar-section">
+                <input type="text" id="search-nodes" class="search-input" placeholder="Search nodes..." />
+                <input type="number" id="degrees-input" class="search-input" placeholder="Degrees" min="1" max="10" value="1" style="width: 100px; display: none;" />
+                <select id="filter-mode-select" class="filter-select" style="display: none;">
+                    <option value="exact">Exactly</option>
+                    <option value="within">Within</option>
+                    <option value="outside">Outside</option>
+                </select>
+                <button type="button" class="btn btn-secondary" id="apply-filter-btn" style="display: none;">Apply Filter</button>
+                <button type="button" class="btn btn-secondary" id="clear-filter-btn" style="display: none;">Clear</button>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="graph-canvas-container card">
+            <canvas id="graph-canvas"></canvas>
+            <div class="canvas-help-text">
+                <span>💡 Right-click nodes for options • Ctrl+Click to select multiple • Double-click to edit</span>
+            </div>
+            <div class="canvas-controls">
+                <button type="button" class="canvas-btn" id="zoom-in-btn" title="Zoom In">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        <line x1="11" y1="8" x2="11" y2="14"></line>
+                        <line x1="8" y1="11" x2="14" y2="11"></line>
+                    </svg>
+                </button>
+                <button type="button" class="canvas-btn" id="zoom-out-btn" title="Zoom Out">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        <line x1="8" y1="11" x2="14" y2="11"></line>
+                    </svg>
+                </button>
+                <button type="button" class="canvas-btn" id="reset-view-btn" title="Reset View">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                        <path d="M21 3v5h-5"></path>
+                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                        <path d="M3 21v-5h5"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Graph Modal -->
+<div id="graph-modal" class="modal" style="display: none;">
+    <div class="modal-backdrop" onclick="closeGraphModal()"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 id="graph-modal-title">New Graph</h3>
+            <button type="button" class="modal-close" onclick="closeGraphModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="graph-form">
+                <div class="form-group">
+                    <label for="graph-name">Graph Name *</label>
+                    <input type="text" id="graph-name" class="form-control" required />
+                </div>
+                <div class="form-group">
+                    <label for="graph-description">Description</label>
+                    <textarea id="graph-description" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeGraphModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-graph-btn">Create Graph</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Node Modal -->
+<div id="node-modal" class="modal" style="display: none;">
+    <div class="modal-backdrop" onclick="closeNodeModal()"></div>
+    <div class="modal-dialog modal-dialog-large">
+        <div class="modal-header">
+            <h3 id="node-modal-title">New Node</h3>
+            <button type="button" class="modal-close" onclick="closeNodeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="node-form">
+                <div class="form-group">
+                    <label for="node-label">Label *</label>
+                    <input type="text" id="node-label" class="form-control" required />
+                </div>
+                <div class="form-group">
+                    <label for="node-notes">Notes</label>
+                    <textarea id="node-notes" class="form-control" rows="5" placeholder="Add detailed notes about this node..."></textarea>
+                </div>
+
+                <!-- Connections Section (only shown when editing) -->
+                <div id="node-connections-section" style="display: none;">
+                    <div class="form-group">
+                        <label>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                            </svg>
+                            Connections
+                        </label>
+
+                        <!-- Add Connection -->
+                        <div class="connection-search-container">
+                            <input type="text" id="connection-search" class="form-control" placeholder="Search nodes to connect..." autocomplete="off" />
+                            <div id="connection-search-results" class="search-results-dropdown" style="display: none;"></div>
+                        </div>
+
+                        <!-- Current Connections List -->
+                        <div id="node-connections-list" class="connections-list"></div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeNodeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-node-btn">Create Node</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Context Menu -->
+<div id="node-context-menu" class="context-menu" style="display: none;">
+    <div class="context-menu-item" data-action="edit">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+        Edit Node
+    </div>
+    <div class="context-menu-item" data-action="link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+        </svg>
+        Link to Selected
+    </div>
+    <div class="context-menu-item" data-action="select">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 11 12 14 22 4"></polyline>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+        </svg>
+        Add to Selection
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" data-action="delete">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+        Delete Node
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const selectedGraphId = @(Model.SelectedGraphId?.ToString() ?? "null");
+    </script>
+    <script src="~/js/network-graph.js" asp-append-version="true"></script>
+}
+

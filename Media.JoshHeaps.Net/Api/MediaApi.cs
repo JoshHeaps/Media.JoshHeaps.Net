@@ -6,17 +6,8 @@ namespace Media.JoshHeaps.Net.Api;
 
 [ApiController]
 [Route("api/media")]
-public class MediaApi : ControllerBase
+public class MediaApi(MediaService mediaService, FolderService folderService) : ControllerBase
 {
-    private readonly MediaService _mediaService;
-    private readonly FolderService _folderService;
-
-    public MediaApi(MediaService mediaService, FolderService folderService)
-    {
-        _mediaService = mediaService;
-        _folderService = folderService;
-    }
-
     [HttpGet("load")]
     public async Task<IActionResult> LoadMedia([FromQuery] int offset = 0, [FromQuery] int limit = 20, [FromQuery] long? folderId = null)
     {
@@ -27,7 +18,7 @@ public class MediaApi : ControllerBase
             return Unauthorized();
         }
 
-        var media = await _mediaService.GetUserMediaAsync(userId.Value, offset, limit, folderId, userId.Value);
+        var media = await mediaService.GetUserMediaAsync(userId.Value, offset, limit, folderId, userId.Value);
 
         return Ok(media);
     }
@@ -43,14 +34,14 @@ public class MediaApi : ControllerBase
         }
 
         // Get media metadata (includes ownership check)
-        var media = await _mediaService.GetMediaByIdAsync(mediaId, userId.Value);
+        var media = await mediaService.GetMediaByIdAsync(mediaId, userId.Value);
         if (media == null)
         {
             return NotFound(new { error = "Image not found or access denied" });
         }
 
         // Get decrypted image data
-        var imageData = await _mediaService.GetDecryptedMediaDataAsync(mediaId, userId.Value);
+        var imageData = await mediaService.GetDecryptedMediaDataAsync(mediaId, userId.Value);
         if (imageData == null)
         {
             return NotFound(new { error = "Image file not found" });
@@ -73,7 +64,7 @@ public class MediaApi : ControllerBase
         // Check folder ownership if uploading to a folder (can't upload to shared folders)
         if (folderId.HasValue)
         {
-            var ownerId = await _folderService.GetFolderOwnerIdAsync(folderId.Value);
+            var ownerId = await folderService.GetFolderOwnerIdAsync(folderId.Value);
             if (ownerId != userId.Value)
             {
                 return Forbid("Cannot upload to shared folders");
@@ -99,7 +90,7 @@ public class MediaApi : ControllerBase
         }
 
         // Save media using existing service
-        var media = await _mediaService.SaveMediaAsync(userId.Value, file, description, folderId);
+        var media = await mediaService.SaveMediaAsync(userId.Value, file, description, folderId);
         if (media == null)
         {
             return StatusCode(500, new { error = "Failed to upload image" });
@@ -118,7 +109,7 @@ public class MediaApi : ControllerBase
             return Unauthorized(new { error = "Not authenticated" });
         }
 
-        var success = await _mediaService.MoveMediaToFolderAsync(request.MediaId, userId.Value, request.FolderId);
+        var success = await mediaService.MoveMediaToFolderAsync(request.MediaId, userId.Value, request.FolderId);
         if (!success)
         {
             return BadRequest(new { error = "Failed to move media" });
@@ -147,7 +138,7 @@ public class MediaApi : ControllerBase
 
         foreach (var mediaId in request.MediaIds)
         {
-            var success = await _mediaService.MoveMediaToFolderAsync(mediaId, userId.Value, request.FolderId);
+            var success = await mediaService.MoveMediaToFolderAsync(mediaId, userId.Value, request.FolderId);
             if (success)
             {
                 successCount++;

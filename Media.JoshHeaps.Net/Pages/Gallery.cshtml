@@ -1,18 +1,26 @@
 @page "{handler?}"
-@model Media.JoshHeaps.Net.Pages.IndexModel
+@model Media.JoshHeaps.Net.Pages.GalleryModel
 @{
-    ViewData["Title"] = "Dashboard";
+    ViewData["Title"] = "Gallery";
     Layout = "_Layout";
 }
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/Home/page.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/Gallery/page.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/gallery.css" asp-append-version="true" />
 }
 
 <div class="dashboard-container">
     <div class="welcome-section">
-        <h1>Welcome back, @Model.Dashboard?.Username!</h1>
+        <div class="welcome-left">
+            <a href="/Landing" class="back-button" title="Back to Home">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </a>
+            <h1>Welcome back, @Model.Dashboard?.Username!</h1>
+        </div>
         <div class="quick-actions">
             @if (Model.Dashboard?.EmailVerified == false)
             {
@@ -59,11 +67,11 @@
     <div class="card">
         <div class="gallery-header">
             <div class="breadcrumb-nav">
-                <a href="/?view=@Model.ViewMode">Home</a>
+                <a href="/Gallery?view=@Model.ViewMode">Home</a>
                 @foreach (var folder in Model.FolderPath)
                 {
                     <span class="breadcrumb-separator">/</span>
-                    <a href="/?folderId=@folder.Id&view=@Model.ViewMode">@folder.Name</a>
+                    <a href="/Gallery?folderId=@folder.Id&view=@Model.ViewMode">@folder.Name</a>
                 }
                 @if (Model.IsSharedFolder && !string.IsNullOrEmpty(Model.SharedByUsername))
                 {
@@ -72,9 +80,9 @@
             </div>
             <div class="header-actions">
                 <div class="view-mode-toggle">
-                    <a href="/?view=own" class="view-mode-btn @(Model.ViewMode == "own" ? "active" : "")">My Folders</a>
-                    <a href="/?view=shared" class="view-mode-btn @(Model.ViewMode == "shared" ? "active" : "")">Shared with Me</a>
-                    <a href="/?view=all" class="view-mode-btn @(Model.ViewMode == "all" ? "active" : "")">All</a>
+                    <a href="/Gallery?view=own" class="view-mode-btn @(Model.ViewMode == "own" ? "active" : "")">My Folders</a>
+                    <a href="/Gallery?view=shared" class="view-mode-btn @(Model.ViewMode == "shared" ? "active" : "")">Shared with Me</a>
+                    <a href="/Gallery?view=all" class="view-mode-btn @(Model.ViewMode == "all" ? "active" : "")">All</a>
                 </div>
                 @if (!Model.IsSharedFolder)
                 {
@@ -97,8 +105,8 @@
             @if (Model.CurrentFolderId.HasValue)
             {
                 var backUrl = Model.FolderPath.Count > 1
-                    ? $"/?folderId={Model.FolderPath[Model.FolderPath.Count - 2].Id}&view={Model.ViewMode}"
-                    : $"/?view={Model.ViewMode}";
+                    ? $"/Gallery?folderId={Model.FolderPath[Model.FolderPath.Count - 2].Id}&view={Model.ViewMode}"
+                    : $"/Gallery?view={Model.ViewMode}";
                 <div class="gallery-item folder-item" data-folder-id="back" onclick="window.location.href='@backUrl'">
                     <div class="folder-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -110,7 +118,7 @@
             }
             @foreach (var sharedFolder in Model.SharedFolders)
             {
-                <div class="gallery-item folder-item shared-folder-item" data-folder-id="@sharedFolder.FolderId" onclick="window.location.href='/?folderId=@sharedFolder.FolderId&view=@Model.ViewMode'">
+                <div class="gallery-item folder-item shared-folder-item" data-folder-id="@sharedFolder.FolderId" onclick="window.location.href='/Gallery?folderId=@sharedFolder.FolderId&view=@Model.ViewMode'">
                     <div class="folder-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -125,7 +133,7 @@
             }
             @foreach (var folder in Model.Folders)
             {
-                <div class="gallery-item folder-item @(folder.UserId != Model.UserId ? "shared-folder-item" : "")" data-folder-id="@folder.Id" data-owner-id="@folder.UserId" onclick="window.location.href='/?folderId=@folder.Id&view=@Model.ViewMode'">
+                <div class="gallery-item folder-item @(folder.UserId != Model.UserId ? "shared-folder-item" : "")" data-folder-id="@folder.Id" data-owner-id="@folder.UserId" onclick="window.location.href='/Gallery?folderId=@folder.Id&view=@Model.ViewMode'">
                     <div class="folder-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>

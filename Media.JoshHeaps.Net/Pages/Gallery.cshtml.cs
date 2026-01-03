@@ -4,16 +4,16 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Media.JoshHeaps.Net.Pages
 {
-    public class IndexModel(UserService userService, MediaService mediaService, FolderService folderService) : AuthenticatedPageModel
+    public class GalleryModel(UserService userService, MediaService mediaService, FolderService folderService) : AuthenticatedPageModel
     {
         private readonly MediaService _mediaService = mediaService;
         private readonly FolderService _folderService = folderService;
 
         public UserDashboard? Dashboard { get; set; }
-        public List<UserMedia> MediaItems { get; set; } = new();
-        public List<Folder> Folders { get; set; } = new();
-        public List<Folder> FolderPath { get; set; } = new();
-        public List<SharedFolderInfo> SharedFolders { get; set; } = new();
+        public List<UserMedia> MediaItems { get; set; } = [];
+        public List<Folder> Folders { get; set; } = [];
+        public List<Folder> FolderPath { get; set; } = [];
+        public List<SharedFolderInfo> SharedFolders { get; set; } = [];
         public long? CurrentFolderId { get; set; }
         public bool IsSharedFolder { get; set; }
         public long? FolderOwnerId { get; set; }
@@ -64,7 +64,7 @@ namespace Media.JoshHeaps.Net.Pages
                 SharedFolders = await _folderService.GetSharedFoldersAsync(UserId);
                 if (!CurrentFolderId.HasValue)
                 {
-                    Folders = new List<Folder>();
+                    Folders = [];
                 }
                 else if (IsSharedFolder && FolderOwnerId.HasValue)
                 {

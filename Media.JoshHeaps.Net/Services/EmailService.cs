@@ -4,28 +4,19 @@ using MimeKit;
 
 namespace Media.JoshHeaps.Net.Services;
 
-public class EmailService
+public class EmailService(IConfiguration config, ILogger<EmailService> logger)
 {
-    private readonly IConfiguration _config;
-    private readonly ILogger<EmailService> _logger;
-
-    public EmailService(IConfiguration config, ILogger<EmailService> logger)
-    {
-        _config = config;
-        _logger = logger;
-    }
-
     public async Task<bool> SendVerificationEmailAsync(string toEmail, string username, string verificationToken)
     {
         try
         {
-            var appUrl = _config["AppUrl"] ?? "https://media.joshheaps.net";
+            var appUrl = config["AppUrl"] ?? "https://media.joshheaps.net";
             var verificationUrl = $"{appUrl}/VerifyEmail?token={verificationToken}";
 
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(
-                _config["Email:FromName"] ?? "Media App",
-                _config["Email:FromEmail"] ?? "noreply@example.com"
+                config["Email:FromName"] ?? "Media App",
+                config["Email:FromEmail"] ?? "noreply@example.com"
             ));
             message.To.Add(new MailboxAddress(username, toEmail));
             message.Subject = "Verify Your Email Address";
@@ -85,11 +76,11 @@ If you didn't create an account, you can safely ignore this email.
 
             using var client = new SmtpClient();
 
-            var smtpHost = _config["Email:SmtpHost"];
-            var smtpPort = int.Parse(_config["Email:SmtpPort"] ?? "587");
-            var smtpUsername = _config["Email:SmtpUsername"];
-            var smtpPassword = _config["Email:SmtpPassword"];
-            var enableSsl = bool.Parse(_config["Email:EnableSsl"] ?? "true");
+            var smtpHost = config["Email:SmtpHost"];
+            var smtpPort = int.Parse(config["Email:SmtpPort"] ?? "587");
+            var smtpUsername = config["Email:SmtpUsername"];
+            var smtpPassword = config["Email:SmtpPassword"];
+            var enableSsl = bool.Parse(config["Email:EnableSsl"] ?? "true");
 
             await client.ConnectAsync(smtpHost, smtpPort, enableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.None);
 
@@ -101,12 +92,12 @@ If you didn't create an account, you can safely ignore this email.
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
-            _logger.LogInformation($"Verification email sent to {toEmail}");
+            logger.LogInformation($"Verification email sent to {toEmail}");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Failed to send verification email to {toEmail}");
+            logger.LogError(ex, $"Failed to send verification email to {toEmail}");
             return false;
         }
     }
@@ -115,13 +106,13 @@ If you didn't create an account, you can safely ignore this email.
     {
         try
         {
-            var appUrl = _config["AppUrl"] ?? "http://localhost:5000";
+            var appUrl = config["AppUrl"] ?? "http://localhost:5000";
             var resetUrl = $"{appUrl}/ResetPassword?token={resetToken}";
 
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(
-                _config["Email:FromName"] ?? "Media App",
-                _config["Email:FromEmail"] ?? "noreply@example.com"
+                config["Email:FromName"] ?? "Media App",
+                config["Email:FromEmail"] ?? "noreply@example.com"
             ));
             message.To.Add(new MailboxAddress(username, toEmail));
             message.Subject = "Password Reset Request";
@@ -184,11 +175,11 @@ If you didn't request a password reset, you can safely ignore this email.
 
             using var client = new SmtpClient();
 
-            var smtpHost = _config["Email:SmtpHost"];
-            var smtpPort = int.Parse(_config["Email:SmtpPort"] ?? "587");
-            var smtpUsername = _config["Email:SmtpUsername"];
-            var smtpPassword = _config["Email:SmtpPassword"];
-            var enableSsl = bool.Parse(_config["Email:EnableSsl"] ?? "true");
+            var smtpHost = config["Email:SmtpHost"];
+            var smtpPort = int.Parse(config["Email:SmtpPort"] ?? "587");
+            var smtpUsername = config["Email:SmtpUsername"];
+            var smtpPassword = config["Email:SmtpPassword"];
+            var enableSsl = bool.Parse(config["Email:EnableSsl"] ?? "true");
 
             await client.ConnectAsync(smtpHost, smtpPort, enableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.None);
 
@@ -200,12 +191,12 @@ If you didn't request a password reset, you can safely ignore this email.
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
-            _logger.LogInformation($"Password reset email sent to {toEmail}");
+            logger.LogInformation($"Password reset email sent to {toEmail}");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Failed to send password reset email to {toEmail}");
+            logger.LogError(ex, $"Failed to send password reset email to {toEmail}");
             return false;
         }
     }

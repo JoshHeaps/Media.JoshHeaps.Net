@@ -16,6 +16,7 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<MediaService>();
 builder.Services.AddScoped<FolderService>();
+builder.Services.AddScoped<GraphService>();
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();
@@ -70,5 +71,12 @@ app.UseAuthorization();
 
 app.MapRazorPages();
 app.MapControllers(); // Map API controllers
+
+// Redirect root to Landing page
+app.MapGet("/", context =>
+{
+    context.Response.Redirect("/Landing");
+    return Task.CompletedTask;
+});
 
 app.Run();

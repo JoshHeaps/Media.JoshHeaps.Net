@@ -36,7 +36,7 @@ Dual auth scheme: **session cookies** for Razor Pages, **JWT Bearer** for API en
 
 ### Database
 
-PostgreSQL via `DbExecutor` singleton — a custom async query executor using raw Npgsql (no ORM). Parameterized queries use reflection on anonymous objects. Migration scripts in `Database/` are numbered 001–011 and must run in order (each script's dependencies come before it).
+PostgreSQL via `DbExecutor` singleton — a custom async query executor using raw Npgsql (no ORM). Parameterized queries use reflection on anonymous objects. Migration scripts in `Database/` are numbered 001–011 and must run in order (each script's dependencies come before it). **All database changes must be backwards-compatible with the existing production database — never drop tables, columns, or alter data in ways that could cause data loss. Use additive migrations (ADD COLUMN, CREATE TABLE, etc.) and `IF NOT EXISTS` guards where appropriate.**
 
 ### File Storage
 

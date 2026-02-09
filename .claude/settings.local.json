@@ -10,7 +10,8 @@
       "Bash(cd:*)",
       "Bash(tree:*)",
       "Bash(del Index.cshtml Index.cshtml.cs)",
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

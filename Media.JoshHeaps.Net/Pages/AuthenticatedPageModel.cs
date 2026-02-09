@@ -8,7 +8,7 @@ public abstract class AuthenticatedPageModel : PageModel
     protected async Task<IActionResult?> RequireRole(string role, DbExecutor dbExecutor)
     {
         var hasRole = await dbExecutor.ExecuteAsync<bool>(
-            "SELECT EXISTS(SELECT 1 FROM app.user_roles WHERE user_id = @UserId AND role = @Role)",
+            "SELECT EXISTS(SELECT 1 FROM app.user_roles ur JOIN app.roles r ON ur.role_id = r.id WHERE ur.user_id = @UserId AND r.name = @Role)",
             new { UserId, Role = role });
 
         return hasRole ? null : NotFound();

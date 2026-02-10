@@ -92,6 +92,66 @@
                         </div>
                     </div>
                 </a>
+
+                @if (Model.IsAdmin)
+                {
+                    <a href="/Admin" class="landing-card">
+                        <div class="card-content">
+                            <div class="card-icon-wrapper">
+                                <div class="card-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="card-text">
+                                <h2>Admin</h2>
+                                <p class="card-description">Site administration and management tools</p>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span class="card-link-text">Open workspace</span>
+                            <div class="card-arrow">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                    </a>
+
+                }
+
+                @if (Model.HasMedicalRole)
+                {
+                    <a href="/MedicalDocs" class="landing-card">
+                        <div class="card-content">
+                            <div class="card-icon-wrapper">
+                                <div class="card-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="12" y1="11" x2="12" y2="17"></line>
+                                        <line x1="9" y1="14" x2="15" y2="14"></line>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="card-text">
+                                <h2>Medical Documents</h2>
+                                <p class="card-description">Organize medical records, receipts, and notes for the family</p>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span class="card-link-text">Open workspace</span>
+                            <div class="card-arrow">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                    </a>
+                }
             </div>
 
             <div class="landing-footer">

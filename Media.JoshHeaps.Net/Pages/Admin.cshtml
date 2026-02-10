@@ -1,0 +1,64 @@
+@page
+@model Media.JoshHeaps.Net.Pages.AdminModel
+@{
+    ViewData["Title"] = "Admin";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+}
+
+<div class="dashboard-container">
+    <div class="welcome-section">
+        <div class="welcome-left">
+            <a href="/Landing" class="back-button" title="Back to Home">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </a>
+            <h1>Admin</h1>
+        </div>
+        <div class="quick-actions">
+            <a href="/Profile" class="btn btn-secondary">Profile</a>
+            <a href="/Logout" class="btn btn-danger">Logout</a>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <div class="section-header">
+            <h2>Roles</h2>
+        </div>
+        <div class="roles-list" id="rolesList"></div>
+        <div class="create-role-form">
+            <input type="text" id="newRoleName" placeholder="New role name" class="form-input" />
+            <button id="createRoleBtn" class="btn btn-primary">Create Role</button>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <div class="section-header">
+            <h2>Users</h2>
+        </div>
+        <div class="table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Roles</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                </tbody>
+            </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/admin.js" asp-append-version="true"></script>
+}

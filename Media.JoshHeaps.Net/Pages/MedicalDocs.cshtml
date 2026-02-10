@@ -1,0 +1,287 @@
+@page
+@model Media.JoshHeaps.Net.Pages.MedicalDocsModel
+@{
+    ViewData["Title"] = "Medical Documents";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/medical-docs.css" asp-append-version="true" />
+}
+
+<div class="dashboard-container">
+    <div class="welcome-section">
+        <div class="welcome-left">
+            <a href="/Landing" class="back-button" title="Back to Home">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </a>
+            <h1>Medical Documents</h1>
+        </div>
+        <div class="quick-actions">
+            <a href="/Profile" class="btn btn-secondary">Profile</a>
+            <a href="/Logout" class="btn btn-danger">Logout</a>
+        </div>
+    </div>
+
+    <div class="medical-layout">
+        <!-- Sidebar: People -->
+        <div class="medical-sidebar">
+            <h3>People</h3>
+            <div class="sidebar-people-list" id="peopleList"></div>
+            <div class="sidebar-add-person">
+                <input type="text" id="newPersonName" placeholder="Add person..." class="form-input" />
+                <button id="addPersonBtn" class="btn btn-primary btn-sm">Add</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="medical-main">
+            <!-- Summary Cards -->
+            <div class="summary-cards" id="summaryCards" style="display: none;">
+                <div class="summary-card active" data-tab="documents" onclick="medDocsSwitchTab('documents')">
+                    <div class="count" id="summaryDocCount">0</div>
+                    <div class="label">Documents</div>
+                </div>
+                <div class="summary-card" data-tab="conditions" onclick="medDocsSwitchTab('conditions')">
+                    <div class="count" id="summaryCondCount">0</div>
+                    <div class="label">Conditions</div>
+                </div>
+                <div class="summary-card" data-tab="prescriptions" onclick="medDocsSwitchTab('prescriptions')">
+                    <div class="count" id="summaryRxCount">0</div>
+                    <div class="label">Prescriptions</div>
+                </div>
+                <div class="summary-card" data-tab="doctors" onclick="medDocsSwitchTab('doctors')">
+                    <div class="count" id="summaryDrCount">0</div>
+                    <div class="label">Doctors</div>
+                </div>
+                <div class="summary-card" data-tab="bills" onclick="medDocsSwitchTab('bills')">
+                    <div class="count" id="summaryBillOop">$0</div>
+                    <div class="label">Total Paid</div>
+                    <div class="sublabel" id="summaryBillCharged">of $0 charged</div>
+                    <div class="sublabel" id="summaryBillDue"></div>
+                </div>
+                <div class="summary-card" data-tab="timeline" onclick="medDocsSwitchTab('timeline')">
+                    <div class="count" id="summaryTimelineIcon">&#128197;</div>
+                    <div class="label">Timeline</div>
+                </div>
+            </div>
+
+            <!-- Main Tabs -->
+            <div class="main-tabs" id="mainTabs">
+                <button class="main-tab" data-tab="documents" onclick="medDocsSwitchTab('documents')">Documents</button>
+                <button class="main-tab" data-tab="conditions" onclick="medDocsSwitchTab('conditions')">Conditions</button>
+                <button class="main-tab" data-tab="prescriptions" onclick="medDocsSwitchTab('prescriptions')">Prescriptions</button>
+                <button class="main-tab active" data-tab="doctors" onclick="medDocsSwitchTab('doctors')">Doctors</button>
+                <button class="main-tab" data-tab="bills" onclick="medDocsSwitchTab('bills')">Bills</button>
+                <button class="main-tab" data-tab="timeline" onclick="medDocsSwitchTab('timeline')">Timeline</button>
+            </div>
+
+            <!-- Tab Panels -->
+            <div class="tab-panels">
+                <!-- Documents Panel -->
+                <div class="tab-panel" id="panel-documents">
+                    <div class="add-form-toggle">
+                        <button class="btn btn-secondary" onclick="medDocsToggleAddForm('panel-documents')">+ Add Document</button>
+                        <span class="doc-count" id="docCount"></span>
+                        <button class="btn btn-secondary btn-sm" id="processAllBtn" style="display: none;" onclick="medDocsProcessAll()">Process All with AI</button>
+                        <button class="btn btn-secondary btn-sm" id="batchModeBtn" style="display: none;" onclick="medDocsToggleBatchMode()">Select &amp; Reprocess</button>
+                    </div>
+                    <div class="add-form-collapsible">
+                        <div class="upload-sub-tabs">
+                            <button class="tab-btn active" data-tab="file">Upload File</button>
+                            <button class="tab-btn" data-tab="note">Text Note</button>
+                        </div>
+
+                        <!-- File Upload -->
+                        <div class="tab-content active" id="tab-file">
+                            <div class="upload-area" id="dropZone">
+                                <div class="upload-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                </div>
+                                <p>Drag & drop files here or <button class="link-btn" id="browseBtn">browse</button></p>
+                                <p class="upload-hint">Any file type, up to 50MB</p>
+                                <input type="file" id="fileInput" multiple style="display: none;" />
+                            </div>
+                            <div class="upload-fields">
+                                <input type="text" id="fileTitle" placeholder="Title (optional)" class="form-input" />
+                                <input type="text" id="fileDescription" placeholder="Description (optional)" class="form-input" />
+                                <input type="date" id="fileDate" class="form-input" />
+                                <select id="fileClassification" class="form-input">
+                                    <option value="">Classification (optional)</option>
+                                    <option value="receipt">Receipt</option>
+                                    <option value="lab_result">Lab Result</option>
+                                    <option value="prescription">Prescription</option>
+                                    <option value="imaging">Imaging</option>
+                                    <option value="dr_note">Doctor Note</option>
+                                    <option value="insurance">Insurance</option>
+                                    <option value="referral">Referral</option>
+                                    <option value="discharge">Discharge Summary</option>
+                                    <option value="recording">Recording/Transcript</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="upload-queue" id="uploadQueue"></div>
+                        </div>
+
+                        <!-- Text Note -->
+                        <div class="tab-content" id="tab-note">
+                            <div class="note-form">
+                                <input type="text" id="noteTitle" placeholder="Title *" class="form-input" />
+                                <textarea id="noteDescription" placeholder="Note content..." class="form-input note-textarea" rows="6"></textarea>
+                                <div class="note-fields">
+                                    <input type="date" id="noteDate" class="form-input" />
+                                    <select id="noteClassification" class="form-input">
+                                        <option value="">Classification (optional)</option>
+                                        <option value="receipt">Receipt</option>
+                                        <option value="lab_result">Lab Result</option>
+                                        <option value="prescription">Prescription</option>
+                                        <option value="dr_note">Doctor Note</option>
+                                        <option value="recording">Recording/Transcript</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <button id="saveNoteBtn" class="btn btn-primary">Save Note</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="filter-bar" id="filterBar" style="display: none;">
+                        <input type="text" id="filterSearch" placeholder="Search documents..." class="form-input filter-search" />
+                        <select id="filterClassification" class="form-input">
+                            <option value="">All Classifications</option>
+                            <option value="receipt">Receipt</option>
+                            <option value="lab_result">Lab Result</option>
+                            <option value="prescription">Prescription</option>
+                            <option value="imaging">Imaging</option>
+                            <option value="dr_note">Doctor Note</option>
+                            <option value="insurance">Insurance</option>
+                            <option value="referral">Referral</option>
+                            <option value="discharge">Discharge Summary</option>
+                            <option value="recording">Recording/Transcript</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <select id="filterDocType" class="form-input">
+                            <option value="">All Types</option>
+                            <option value="file">Files</option>
+                            <option value="note">Notes</option>
+                        </select>
+                        <select id="filterDoctor" class="form-input">
+                            <option value="">All Doctors</option>
+                        </select>
+                        <select id="filterTag" class="form-input">
+                            <option value="">All Tags</option>
+                        </select>
+                        <select id="filterCondition" class="form-input">
+                            <option value="">All Conditions</option>
+                        </select>
+                        <input type="date" id="filterFromDate" class="form-input" title="From date" />
+                        <input type="date" id="filterToDate" class="form-input" title="To date" />
+                        <button class="btn btn-secondary btn-sm" onclick="medDocsClearFilters()">Clear</button>
+                    </div>
+                    <div class="batch-toolbar" id="batchToolbar" style="display:none">
+                        <label><input type="checkbox" id="selectAllCheckbox" onchange="medDocsToggleSelectAll(this.checked)"> Select All</label>
+                        <span id="batchCount">0 selected</span>
+                        <button class="btn btn-primary btn-sm" onclick="medDocsProcessBatch()">Reprocess Selected</button>
+                        <button class="btn btn-secondary btn-sm" onclick="medDocsToggleBatchMode()">Cancel</button>
+                    </div>
+                    <div class="documents-list" id="documentsList"></div>
+                </div>
+
+                <!-- Conditions Panel -->
+                <div class="tab-panel" id="panel-conditions">
+                    <div class="add-form-toggle">
+                        <button class="btn btn-secondary" onclick="medDocsToggleAddForm('panel-conditions')">+ Add Condition</button>
+                    </div>
+                    <div class="add-form-collapsible">
+                        <div class="inline-form-row">
+                            <input type="text" id="newConditionName" placeholder="Condition name *" class="form-input" />
+                            <input type="date" id="newConditionDate" class="form-input" title="Diagnosed date" />
+                            <input type="text" id="newConditionNotes" placeholder="Notes" class="form-input" />
+                            <button class="btn btn-primary btn-sm" onclick="medDocsAddCondition()">Add</button>
+                        </div>
+                    </div>
+                    <div class="conditions-list" id="conditionsList"></div>
+                </div>
+
+                <!-- Prescriptions Panel -->
+                <div class="tab-panel" id="panel-prescriptions">
+                    <div class="add-form-toggle">
+                        <button class="btn btn-secondary" onclick="medDocsToggleAddForm('panel-prescriptions')">+ Add Prescription</button>
+                    </div>
+                    <div class="add-form-collapsible">
+                        <div class="inline-form-row">
+                            <input type="text" id="newRxMedication" placeholder="Medication name *" class="form-input" />
+                            <input type="text" id="newRxNumber" placeholder="RX#" class="form-input" style="max-width:120px" />
+                            <input type="text" id="newRxDosage" placeholder="Dosage" class="form-input" />
+                            <input type="text" id="newRxFrequency" placeholder="Frequency" class="form-input" />
+                            <select id="newRxDoctor" class="form-input">
+                                <option value="">Doctor (optional)</option>
+                            </select>
+                            <input type="date" id="newRxStartDate" class="form-input" title="Start date" />
+                            <button class="btn btn-primary btn-sm" onclick="medDocsAddPrescription()">Add</button>
+                        </div>
+                    </div>
+                    <div class="prescriptions-list" id="prescriptionsList"></div>
+                </div>
+
+                <!-- Doctors Panel -->
+                <div class="tab-panel active" id="panel-doctors">
+                    <div class="add-form-toggle">
+                        <button class="btn btn-secondary" onclick="medDocsToggleAddForm('panel-doctors')">+ Add Doctor</button>
+                    </div>
+                    <div class="add-form-collapsible">
+                        <div class="inline-form-row">
+                            <input type="text" id="newDoctorName" placeholder="Name *" class="form-input" />
+                            <input type="text" id="newDoctorSpecialty" placeholder="Specialty" class="form-input" />
+                            <input type="text" id="newDoctorPhone" placeholder="Phone" class="form-input" />
+                            <input type="text" id="newDoctorAddress" placeholder="Address" class="form-input" />
+                            <button class="btn btn-primary btn-sm" onclick="medDocsAddDoctor()">Add</button>
+                        </div>
+                    </div>
+                    <div class="doctors-list" id="doctorsList"></div>
+                </div>
+
+                <!-- Bills Panel -->
+                <div class="tab-panel" id="panel-bills">
+                    <div class="add-form-toggle">
+                        <button class="btn btn-secondary" onclick="medDocsToggleAddForm('panel-bills')">+ Add Provider</button>
+                    </div>
+                    <div class="add-form-collapsible">
+                        <div class="inline-form-row">
+                            <input type="text" id="newProviderName" placeholder="Provider name *" class="form-input" />
+                            <input type="text" id="newProviderNotes" placeholder="Notes (optional)" class="form-input" />
+                            <button class="btn btn-primary btn-sm" onclick="medDocsAddProvider()">Add</button>
+                        </div>
+                    </div>
+                    <div id="billSummarySection"></div>
+                    <div class="providers-list" id="providersList"></div>
+                </div>
+
+                <!-- Timeline Panel -->
+                <div class="tab-panel" id="panel-timeline">
+                    <div id="timelineList"></div>
+                    <button class="btn btn-secondary" id="timelineLoadMore" style="display:none" onclick="medDocsLoadMoreTimeline()">Load More</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/medical-docs/state.js" asp-append-version="true"></script>
+    <script src="~/js/medical-docs/tabs.js" asp-append-version="true"></script>
+    <script src="~/js/medical-docs/people.js" asp-append-version="true"></script>
+    <script src="~/js/medical-docs/documents.js" asp-append-version="true"></script>
+    <script src="~/js/medical-docs/doctors.js" asp-append-version="true"></script>
+    <script src="~/js/medical-docs/conditions.js" asp-append-version="true"></script>
+    <script src="~/js/medical-docs/prescriptions.js" asp-append-version="true"></script>
+    <script src="~/js/medical-docs/bills.js" asp-append-version="true"></script>
+    <script src="~/js/medical-docs/timeline.js" asp-append-version="true"></script>
+    <script src="~/js/medical-docs/init.js" asp-append-version="true"></script>
+}

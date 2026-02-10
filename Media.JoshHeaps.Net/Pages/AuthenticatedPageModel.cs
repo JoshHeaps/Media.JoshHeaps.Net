@@ -5,6 +5,15 @@ namespace Media.JoshHeaps.Net.Pages;
 
 public abstract class AuthenticatedPageModel : PageModel
 {
+    protected async Task<IActionResult?> RequireRole(string role, DbExecutor dbExecutor)
+    {
+        var hasRole = await dbExecutor.ExecuteAsync<bool>(
+            "SELECT EXISTS(SELECT 1 FROM app.user_roles ur JOIN app.roles r ON ur.role_id = r.id WHERE ur.user_id = @UserId AND r.name = @Role)",
+            new { UserId, Role = role });
+
+        return hasRole ? null : NotFound();
+    }
+
     public long UserId { get; private set; }
     protected string Username { get; private set; } = string.Empty;
     protected string Email { get; private set; } = string.Empty;

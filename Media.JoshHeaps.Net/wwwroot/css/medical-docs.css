@@ -773,6 +773,10 @@
     flex-shrink: 0;
 }
 
+.rx-number-input {
+    max-width: 120px;
+}
+
 .inline-edit-form {
     width: 100%;
 }
@@ -1370,6 +1374,10 @@
 /* ======================== */
 
 @media (max-width: 768px) {
+    .dashboard-container {
+        padding: 16px 12px;
+    }
+
     .welcome-section {
         flex-direction: column;
         gap: 16px;
@@ -1377,8 +1385,18 @@
         align-items: flex-start;
     }
 
+    .quick-actions {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .quick-actions .btn {
+        flex: 1 1 100%;
+    }
+
     .medical-layout {
         flex-direction: column;
+        min-height: unset;
     }
 
     .medical-sidebar {
@@ -1409,7 +1427,7 @@
     }
 
     .summary-cards {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
     }
 
     .upload-fields {
@@ -1424,9 +1442,24 @@
         flex-wrap: wrap;
     }
 
+    .doc-type-icon,
+    .doc-info {
+        flex: 0 0 auto;
+    }
+
+    .doc-info {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
     .doc-actions {
         width: 100%;
         justify-content: flex-end;
+        margin-top: 4px;
+    }
+
+    .doc-actions button {
+        padding: 8px 12px;
     }
 
     .inline-form-row {
@@ -1435,6 +1468,10 @@
 
     .inline-form-row .form-input {
         min-width: unset;
+        width: 100%;
+    }
+
+    .inline-form-row .btn {
         width: 100%;
     }
 
@@ -1454,10 +1491,19 @@
 
     .main-tabs {
         overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .main-tabs::-webkit-scrollbar {
+        display: none;
     }
 
     .cost-aggregation {
         grid-template-columns: 1fr;
+    }
+
+    .filter-bar {
+        flex-direction: column;
     }
 
     .filter-bar .form-input {
@@ -1466,8 +1512,17 @@
         flex: 1 1 100%;
     }
 
+    .filter-bar input[type="date"] {
+        width: 100%;
+        flex: 1 1 100%;
+    }
+
     .filter-search {
         flex: 1 1 100% !important;
+    }
+
+    .btn-sm {
+        padding: 8px 14px;
     }
 
     .doc-detail-row-inline {
@@ -1476,5 +1531,32 @@
 
     .doc-detail-row-inline > div[style*="grid-column"] {
         grid-column: auto !important;
+    }
+}
+
+/* ======================== */
+/* Responsive (<=480px)      */
+/* ======================== */
+
+@media (max-width: 480px) {
+    .summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .welcome-section h1 {
+        font-size: 22px;
+    }
+
+    .welcome-section {
+        padding: 16px;
+    }
+
+    .doc-item {
+        padding: 10px 12px;
+        gap: 10px;
+    }
+
+    .summary-card {
+        padding: 12px;
     }
 }

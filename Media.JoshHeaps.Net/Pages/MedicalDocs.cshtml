@@ -285,6 +285,23 @@
     </div>
 </div>
 
+<!-- Share Access Modal -->
+<div class="doc-viewer-overlay" id="shareAccessOverlay" style="display:none" onclick="medDocsCloseShareModal(event)">
+    <div class="doc-viewer-modal" style="max-width:420px;max-height:400px;" onclick="event.stopPropagation()">
+        <div class="doc-viewer-header">
+            <span class="doc-viewer-title">Share Patient Access</span>
+            <button class="doc-viewer-close" onclick="medDocsCloseShareModal()" title="Close">&times;</button>
+        </div>
+        <div class="doc-viewer-body" style="padding:1rem;overflow-y:auto;">
+            <div id="shareAccessList" style="margin-bottom:1rem;"></div>
+            <div style="display:flex;gap:0.5rem;">
+                <input type="text" id="shareUsername" placeholder="Username..." class="form-input" style="flex:1;" />
+                <button class="btn btn-primary btn-sm" onclick="medDocsGrantAccess()">Grant</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script src="~/js/medical-docs/state.js" asp-append-version="true"></script>
     <script src="~/js/medical-docs/tabs.js" asp-append-version="true"></script>

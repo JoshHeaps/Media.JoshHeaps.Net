@@ -447,7 +447,7 @@ Only include fields you can confidently extract. Return ONLY the JSON object, no
                 return null;
             }
 
-            _logger.LogError("claude CLI exited with code {ExitCode}: {Stderr}", process.ExitCode, stderr);
+            _logger.LogError("claude CLI exited with code {ExitCode}.\nStderr: {Stderr}\nStdout: {Stdout}", process.ExitCode, stderr, stdout);
             return null;
         }
 

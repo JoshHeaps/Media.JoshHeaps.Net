@@ -9,3 +9,9 @@ public class MedicalPerson
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
+
+public class PersonAccessUser
+{
+    public long Id { get; set; }
+    public string Username { get; set; } = string.Empty;
+}

@@ -17,7 +17,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
 
-        var people = await medicalDocsService.GetPeopleAsync();
+        var people = await medicalDocsService.GetPeopleAsync(userId.Value);
         return Ok(people);
     }
 
@@ -31,11 +31,66 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new { error = "Name is required" });
 
-        var person = await medicalDocsService.CreatePersonAsync(request.Name.Trim(), request.DateOfBirth, request.Notes);
+        var person = await medicalDocsService.CreatePersonAsync(userId.Value, request.Name.Trim(), request.DateOfBirth, request.Notes);
         if (person == null)
             return StatusCode(500, new { error = "Failed to create person" });
 
         return Ok(person);
+    }
+
+    // --- People Access ---
+
+    [HttpGet("people/{personId}/access")]
+    public async Task<IActionResult> GetPersonAccess(long personId)
+    {
+        var userId = GetUserIdFromAuth();
+        if (userId == null) return Unauthorized();
+        if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
+
+        var users = await medicalDocsService.GetPeopleAccessAsync(personId);
+        return Ok(users);
+    }
+
+    [HttpPost("people/{personId}/access")]
+    public async Task<IActionResult> GrantPersonAccess(long personId, [FromBody] GrantAccessRequest request)
+    {
+        var userId = GetUserIdFromAuth();
+        if (userId == null) return Unauthorized();
+        if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.Username))
+            return BadRequest(new { error = "Username is required" });
+
+        var targetUser = await dbExecutor.ExecuteReaderAsync(
+            "SELECT id FROM app.users WHERE LOWER(username) = LOWER(@username)",
+            reader => reader.GetInt64(0),
+            new { username = request.Username.Trim() });
+
+        if (targetUser == 0)
+            return NotFound(new { error = "User not found" });
+
+        var success = await medicalDocsService.GrantAccessAsync(personId, targetUser);
+        if (!success)
+            return StatusCode(500, new { error = "Failed to grant access" });
+
+        return Ok(new { success = true });
+    }
+
+    [HttpDelete("people/{personId}/access/{targetUserId}")]
+    public async Task<IActionResult> RevokePersonAccess(long personId, long targetUserId)
+    {
+        var userId = GetUserIdFromAuth();
+        if (userId == null) return Unauthorized();
+        if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
+
+        var success = await medicalDocsService.RevokeAccessAsync(personId, targetUserId);
+        if (!success)
+            return BadRequest(new { error = "Cannot revoke access — at least one user must have access" });
+
+        return Ok(new { success = true });
     }
 
     // --- Documents ---
@@ -46,6 +101,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
         if (limit < 1 || limit > 100) limit = 50;
         if (offset < 0) offset = 0;
@@ -75,6 +131,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (personId <= 0)
             return BadRequest(new { error = "personId is required" });
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         if (limit < 1 || limit > 100) limit = 50;
         if (offset < 0) offset = 0;
@@ -92,6 +149,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (personId <= 0)
             return BadRequest(new { error = "personId is required" });
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         var tags = await medicalDocsService.GetPersonTagsAsync(personId);
         return Ok(tags);
@@ -104,6 +162,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "No file provided" });
@@ -126,6 +185,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (request.PersonId <= 0)
             return BadRequest(new { error = "Person is required" });
+        if (!await HasPersonAccess(userId.Value, request.PersonId)) return Forbid();
         if (string.IsNullOrWhiteSpace(request.Title))
             return BadRequest(new { error = "Title is required" });
 
@@ -144,6 +204,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "document", id)) return Forbid();
 
         var doc = await medicalDocsService.GetDocumentByIdAsync(id);
         if (doc == null) return NotFound(new { error = "Document not found" });
@@ -157,6 +218,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "document", id)) return Forbid();
 
         var doc = await medicalDocsService.GetDocumentByIdAsync(id);
         if (doc == null) return NotFound(new { error = "Document not found" });
@@ -176,6 +238,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "document", id)) return Forbid();
 
         var success = await medicalDocsService.UpdateDocumentAsync(id, request.Title, request.Description, request.DocumentDate, request.Classification, request.DoctorId);
         if (!success) return NotFound(new { error = "Document not found" });
@@ -189,6 +252,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "document", id)) return Forbid();
 
         var success = await medicalDocsService.DeleteDocumentAsync(id);
         if (!success) return NotFound(new { error = "Document not found" });
@@ -204,6 +268,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "document", id)) return Forbid();
 
         var doc = await medicalDocsService.GetDocumentByIdAsync(id);
         if (doc == null) return NotFound(new { error = "Document not found" });
@@ -260,12 +325,13 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "document", id)) return Forbid();
 
         var tags = await medicalDocsService.GetDocumentTagsAsync(id);
         return Ok(tags);
     }
 
-    // --- Doctors ---
+    // --- Doctors (shared, no per-person access check) ---
 
     [HttpGet("doctors")]
     public async Task<IActionResult> GetDoctors()
@@ -335,6 +401,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (personId <= 0)
             return BadRequest(new { error = "personId is required" });
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         var conditions = await medicalDocsService.GetConditionsAsync(personId);
         return Ok(conditions);
@@ -349,6 +416,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (request.PersonId <= 0)
             return BadRequest(new { error = "Person is required" });
+        if (!await HasPersonAccess(userId.Value, request.PersonId)) return Forbid();
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new { error = "Name is required" });
 
@@ -365,6 +433,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "condition", id)) return Forbid();
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new { error = "Name is required" });
@@ -381,6 +450,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "condition", id)) return Forbid();
 
         var success = await medicalDocsService.DeleteConditionAsync(id);
         if (!success) return NotFound(new { error = "Condition not found" });
@@ -399,6 +469,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (personId <= 0)
             return BadRequest(new { error = "personId is required" });
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         var prescriptions = await medicalDocsService.GetPrescriptionsAsync(personId);
         return Ok(prescriptions);
@@ -413,6 +484,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (request.PersonId <= 0)
             return BadRequest(new { error = "Person is required" });
+        if (!await HasPersonAccess(userId.Value, request.PersonId)) return Forbid();
         if (string.IsNullOrWhiteSpace(request.MedicationName))
             return BadRequest(new { error = "Medication name is required" });
 
@@ -429,6 +501,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "prescription", id)) return Forbid();
 
         if (string.IsNullOrWhiteSpace(request.MedicationName))
             return BadRequest(new { error = "Medication name is required" });
@@ -445,6 +518,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "prescription", id)) return Forbid();
 
         var success = await medicalDocsService.DeletePrescriptionAsync(id);
         if (!success) return NotFound(new { error = "Prescription not found" });
@@ -460,6 +534,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "prescription", id)) return Forbid();
 
         var pickups = await medicalDocsService.GetPickupsAsync(id);
         return Ok(pickups);
@@ -471,6 +546,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "prescription", id)) return Forbid();
 
         var pickup = await medicalDocsService.CreatePickupAsync(id, request.PickupDate, request.Quantity, request.Pharmacy, request.Cost, request.Notes);
         if (pickup == null)
@@ -485,6 +561,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "pickup", id)) return Forbid();
 
         var success = await medicalDocsService.DeletePickupAsync(id);
         if (!success) return NotFound(new { error = "Pickup not found" });
@@ -503,6 +580,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (personId <= 0)
             return BadRequest(new { error = "personId is required" });
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         var providers = await medicalDocsService.GetProvidersAsync(personId);
         return Ok(providers);
@@ -517,6 +595,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (request.PersonId <= 0)
             return BadRequest(new { error = "Person is required" });
+        if (!await HasPersonAccess(userId.Value, request.PersonId)) return Forbid();
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new { error = "Name is required" });
 
@@ -533,6 +612,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "provider", id)) return Forbid();
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new { error = "Name is required" });
@@ -549,6 +629,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "provider", id)) return Forbid();
 
         var success = await medicalDocsService.DeleteProviderAsync(id);
         if (!success) return NotFound(new { error = "Provider not found" });
@@ -564,6 +645,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "provider", id)) return Forbid();
 
         var payments = await medicalDocsService.GetProviderPaymentsAsync(id);
         return Ok(payments);
@@ -575,6 +657,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "provider", id)) return Forbid();
 
         if (request.Amount <= 0)
             return BadRequest(new { error = "Amount must be greater than 0" });
@@ -592,6 +675,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "provider-payment", id)) return Forbid();
 
         var success = await medicalDocsService.DeleteProviderPaymentAsync(id);
         if (!success) return NotFound(new { error = "Payment not found" });
@@ -610,6 +694,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (personId <= 0)
             return BadRequest(new { error = "personId is required" });
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         var bills = await medicalDocsService.GetBillsAsync(personId, providerId);
         return Ok(bills);
@@ -624,6 +709,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (request.PersonId <= 0)
             return BadRequest(new { error = "Person is required" });
+        if (!await HasPersonAccess(userId.Value, request.PersonId)) return Forbid();
         if (request.TotalAmount <= 0)
             return BadRequest(new { error = "Amount must be greater than 0" });
 
@@ -640,6 +726,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "bill", id)) return Forbid();
 
         if (request.TotalAmount <= 0)
             return BadRequest(new { error = "Amount must be greater than 0" });
@@ -656,6 +743,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "bill", id)) return Forbid();
 
         var success = await medicalDocsService.DeleteBillAsync(id);
         if (!success) return NotFound(new { error = "Bill not found" });
@@ -669,6 +757,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "bill", id)) return Forbid();
 
         if (request.DocumentId <= 0)
             return BadRequest(new { error = "Document is required" });
@@ -686,6 +775,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "bill", billId)) return Forbid();
 
         var success = await medicalDocsService.UnlinkDocumentFromBillAsync(billId, docId);
         if (!success) return NotFound(new { error = "Link not found" });
@@ -701,6 +791,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "bill", id)) return Forbid();
 
         var charges = await medicalDocsService.GetChargesAsync(id);
         return Ok(charges);
@@ -712,6 +803,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "bill", id)) return Forbid();
 
         if (string.IsNullOrWhiteSpace(request.Description))
             return BadRequest(new { error = "Description is required" });
@@ -731,6 +823,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "bill-charge", id)) return Forbid();
 
         var success = await medicalDocsService.DeleteChargeAsync(id);
         if (!success) return NotFound(new { error = "Charge not found" });
@@ -749,6 +842,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (personId <= 0)
             return BadRequest(new { error = "personId is required" });
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         if (limit < 1 || limit > 200) limit = 100;
         if (offset < 0) offset = 0;
@@ -768,6 +862,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (personId <= 0 || doctorId <= 0)
             return BadRequest(new { error = "personId and doctorId are required" });
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         var data = await medicalDocsService.GetVisitPrepAsync(personId, doctorId);
         return Ok(data);
@@ -782,6 +877,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (request.PersonId <= 0 || request.DoctorId <= 0)
             return BadRequest(new { error = "personId and doctorId are required" });
+        if (!await HasPersonAccess(userId.Value, request.PersonId)) return Forbid();
 
         var data = await medicalDocsService.GetVisitPrepAsync(request.PersonId, request.DoctorId);
         var doctor = await medicalDocsService.GetDoctorByIdAsync(request.DoctorId);
@@ -801,18 +897,31 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
         if (personId <= 0)
             return BadRequest(new { error = "personId is required" });
+        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
 
         var summary = await medicalDocsService.GetBillSummaryAsync(personId);
         return Ok(summary);
     }
 
-    // --- Auth helpers (same pattern as AdminApi) ---
+    // --- Auth helpers ---
 
     private async Task<bool> HasMedicalAccess(long userId)
     {
         return await dbExecutor.ExecuteAsync<bool>(
             "SELECT EXISTS(SELECT 1 FROM app.user_roles ur JOIN app.roles r ON ur.role_id = r.id WHERE ur.user_id = @UserId AND r.name = 'medical')",
             new { UserId = userId });
+    }
+
+    private async Task<bool> HasPersonAccess(long userId, long personId)
+    {
+        return await medicalDocsService.HasAccessToPersonAsync(userId, personId);
+    }
+
+    private async Task<bool> HasResourceAccess(long userId, string resourceType, long resourceId)
+    {
+        var personId = await medicalDocsService.GetPersonIdForResourceAsync(resourceType, resourceId);
+        if (personId == null) return false;
+        return await medicalDocsService.HasAccessToPersonAsync(userId, personId.Value);
     }
 
     private long? GetUserIdFromAuth()
@@ -851,3 +960,4 @@ public record LinkDocumentRequest(long DocumentId);
 public record CreateChargeRequest(string Description, decimal Amount);
 public record ProcessBatchRequest(List<long> DocumentIds);
 public record VisitPrepSummaryRequest(long PersonId, long DoctorId);
+public record GrantAccessRequest(string Username);

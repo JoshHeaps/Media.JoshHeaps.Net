@@ -152,6 +152,29 @@
     display: block;
 }
 
+.form-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.form-options .checkbox-wrapper {
+    margin-bottom: 0;
+}
+
+.forgot-password-link {
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.forgot-password-link:hover {
+    color: var(--accent-primary);
+    text-decoration: underline;
+}
+
 .checkbox-wrapper {
     display: flex;
     align-items: center;

@@ -1,0 +1,102 @@
+@page
+@model Media.JoshHeaps.Net.Pages.LoginHelpModel
+@{
+    ViewData["Title"] = "Login Help";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        @if (Model.ShowResetForm)
+        {
+            <div class="auth-header">
+                <h1>Reset Password</h1>
+                <p>Enter your new password below</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger">
+                    @Model.ErrorMessage
+                </div>
+            }
+
+            <form id="resetPasswordForm" method="post" asp-page-handler="ResetPassword">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Token" value="@Model.Token" />
+
+                <div class="form-group">
+                    <label for="newPassword" class="form-label">New Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" class="form-control" id="newPassword" name="NewPassword"
+                               autocomplete="new-password" required minlength="8" />
+                        <button type="button" class="password-toggle">Show</button>
+                    </div>
+                    <div class="invalid-feedback"></div>
+                    <div class="password-strength">
+                        <div class="password-strength-bar"></div>
+                    </div>
+                    <div class="password-strength-text"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword" class="form-label">Confirm Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" class="form-control" id="confirmPassword" name="ConfirmPassword"
+                               autocomplete="new-password" required minlength="8" />
+                        <button type="button" class="password-toggle">Show</button>
+                    </div>
+                    <div class="invalid-feedback"></div>
+                </div>
+
+                <button type="submit" class="btn-primary">Reset Password</button>
+            </form>
+        }
+        else
+        {
+            <div class="auth-header">
+                <h1>Forgot Password</h1>
+                <p>Enter your email to receive a reset link</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger">
+                    @Model.ErrorMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+            {
+                <div class="alert alert-success">
+                    @Model.SuccessMessage
+                </div>
+            }
+
+            <form id="requestResetForm" method="post" asp-page-handler="RequestReset">
+                @Html.AntiForgeryToken()
+
+                <div class="form-group">
+                    <label for="email" class="form-label">Email Address</label>
+                    <input type="email" class="form-control" id="email" name="Email"
+                           value="@Model.Email" autocomplete="email" required />
+                    <div class="invalid-feedback"></div>
+                </div>
+
+                <button type="submit" class="btn-primary">Send Reset Link</button>
+            </form>
+        }
+
+        <div class="auth-footer">
+            <p>Remember your password? <a href="/Login">Sign in</a></p>
+        </div>
+    </div>
+</div>

@@ -6,12 +6,16 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
 {
     // --- People ---
 
-    public async Task<List<MedicalPerson>> GetPeopleAsync()
+    public async Task<List<MedicalPerson>> GetPeopleAsync(long userId)
     {
         try
         {
             return await db.ExecuteListReaderAsync(
-                "SELECT id, name, date_of_birth, notes, created_at, updated_at FROM app.medical_people ORDER BY name",
+                @"SELECT mp.id, mp.name, mp.date_of_birth, mp.notes, mp.created_at, mp.updated_at
+                  FROM app.medical_people mp
+                  JOIN app.medical_people_access mpa ON mpa.person_id = mp.id
+                  WHERE mpa.user_id = @userId
+                  ORDER BY mp.name",
                 reader => new MedicalPerson
                 {
                     Id = reader.GetInt64(0),
@@ -20,7 +24,8 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     Notes = reader.IsDBNull(3) ? null : reader.GetString(3),
                     CreatedAt = reader.GetDateTime(4),
                     UpdatedAt = reader.GetDateTime(5)
-                });
+                },
+                new { userId });
         }
         catch (Exception ex)
         {
@@ -29,12 +34,12 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
         }
     }
 
-    public async Task<MedicalPerson?> CreatePersonAsync(string name, DateTime? dateOfBirth = null, string? notes = null)
+    public async Task<MedicalPerson?> CreatePersonAsync(long userId, string name, DateTime? dateOfBirth = null, string? notes = null)
     {
         try
         {
             var now = DateTime.UtcNow;
-            return await db.ExecuteReaderAsync(
+            var person = await db.ExecuteReaderAsync(
                 @"INSERT INTO app.medical_people (name, date_of_birth, notes, created_at, updated_at)
                   VALUES (@name, @dateOfBirth, @notes, @createdAt, @updatedAt)
                   RETURNING id, name, date_of_birth, notes, created_at, updated_at",
@@ -48,10 +53,122 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     UpdatedAt = reader.GetDateTime(5)
                 },
                 new { name, dateOfBirth, notes, createdAt = now, updatedAt = now });
+
+            if (person != null)
+            {
+                await db.ExecuteNonQueryAsync(
+                    "INSERT INTO app.medical_people_access (person_id, user_id) VALUES (@personId, @userId) ON CONFLICT DO NOTHING",
+                    new { personId = person.Id, userId });
+            }
+
+            return person;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to create medical person");
+            return null;
+        }
+    }
+
+    // --- People Access ---
+
+    public async Task<bool> HasAccessToPersonAsync(long userId, long personId)
+    {
+        try
+        {
+            return await db.ExecuteAsync<bool>(
+                "SELECT EXISTS(SELECT 1 FROM app.medical_people_access WHERE user_id = @userId AND person_id = @personId)",
+                new { userId, personId });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to check person access");
+            return false;
+        }
+    }
+
+    public async Task<bool> GrantAccessAsync(long personId, long targetUserId)
+    {
+        try
+        {
+            await db.ExecuteNonQueryAsync(
+                "INSERT INTO app.medical_people_access (person_id, user_id) VALUES (@personId, @userId) ON CONFLICT DO NOTHING",
+                new { personId, userId = targetUserId });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to grant person access");
+            return false;
+        }
+    }
+
+    public async Task<bool> RevokeAccessAsync(long personId, long targetUserId)
+    {
+        try
+        {
+            var count = await db.ExecuteAsync<long>(
+                "SELECT COUNT(*) FROM app.medical_people_access WHERE person_id = @personId",
+                new { personId });
+            if (count <= 1)
+                return false;
+
+            await db.ExecuteNonQueryAsync(
+                "DELETE FROM app.medical_people_access WHERE person_id = @personId AND user_id = @userId",
+                new { personId, userId = targetUserId });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to revoke person access");
+            return false;
+        }
+    }
+
+    public async Task<List<PersonAccessUser>> GetPeopleAccessAsync(long personId)
+    {
+        try
+        {
+            return await db.ExecuteListReaderAsync(
+                @"SELECT u.id, u.username FROM app.users u
+                  JOIN app.medical_people_access mpa ON mpa.user_id = u.id
+                  WHERE mpa.person_id = @personId
+                  ORDER BY u.username",
+                reader => new PersonAccessUser
+                {
+                    Id = reader.GetInt64(0),
+                    Username = reader.GetString(1)
+                },
+                new { personId });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to get person access list");
+            return [];
+        }
+    }
+
+    public async Task<long?> GetPersonIdForResourceAsync(string resourceType, long resourceId)
+    {
+        try
+        {
+            var sql = resourceType switch
+            {
+                "document" => "SELECT person_id FROM app.medical_documents WHERE id = @id",
+                "condition" => "SELECT person_id FROM app.medical_conditions WHERE id = @id",
+                "prescription" => "SELECT person_id FROM app.medical_prescriptions WHERE id = @id",
+                "pickup" => "SELECT p.person_id FROM app.medical_prescription_pickups pk JOIN app.medical_prescriptions p ON pk.prescription_id = p.id WHERE pk.id = @id",
+                "provider" => "SELECT person_id FROM app.medical_billing_providers WHERE id = @id",
+                "provider-payment" => "SELECT bp.person_id FROM app.medical_provider_payments pp JOIN app.medical_billing_providers bp ON pp.provider_id = bp.id WHERE pp.id = @id",
+                "bill" => "SELECT person_id FROM app.medical_bills WHERE id = @id",
+                "bill-charge" => "SELECT b.person_id FROM app.medical_bill_charges bc JOIN app.medical_bills b ON bc.bill_id = b.id WHERE bc.id = @id",
+                _ => throw new ArgumentException($"Unknown resource type: {resourceType}")
+            };
+            return await db.ExecuteAsync<long?>(sql, new { id = resourceId });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to get person ID for {ResourceType} {ResourceId}", resourceType, resourceId);
             return null;
         }
     }

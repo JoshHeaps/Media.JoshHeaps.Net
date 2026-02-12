@@ -20,7 +20,7 @@ public class LoginModel(AuthService authService) : PageModel
     public string? SuccessMessage { get; set; }
     public string? WarningMessage { get; set; }
 
-    public void OnGet([FromQuery] string? registered, [FromQuery] string? verified)
+    public void OnGet([FromQuery] string? registered, [FromQuery] string? verified, [FromQuery] string? reset)
     {
         // Check if user is already logged in
         var userId = HttpContext.Session.GetString("UserId");
@@ -40,6 +40,12 @@ public class LoginModel(AuthService authService) : PageModel
         if (verified == "true")
         {
             SuccessMessage = "Email verified! You can now sign in.";
+        }
+
+        // Show success message if password was just reset
+        if (reset == "true")
+        {
+            SuccessMessage = "Your password has been reset. You can now sign in with your new password.";
         }
     }
 

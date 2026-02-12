@@ -323,6 +323,39 @@
     color: #fff;
 }
 
+.person-pill-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.person-pill-row .person-pill {
+    flex: 1;
+    min-width: 0;
+}
+
+.person-share-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-primary);
+    border-radius: 50%;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.person-share-btn:hover {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    background: var(--bg-tertiary);
+}
+
 /* ======================== */
 /* Form Inputs               */
 /* ======================== */

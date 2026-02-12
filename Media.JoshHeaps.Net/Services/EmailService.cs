@@ -107,7 +107,7 @@ If you didn't create an account, you can safely ignore this email.
         try
         {
             var appUrl = config["AppUrl"] ?? "http://localhost:5000";
-            var resetUrl = $"{appUrl}/ResetPassword?token={resetToken}";
+            var resetUrl = $"{appUrl}/LoginHelp?token={resetToken}";
 
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(

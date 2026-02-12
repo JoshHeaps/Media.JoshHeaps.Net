@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Media.JoshHeaps.Net;
 using Media.JoshHeaps.Net.Models;
 
@@ -301,5 +303,174 @@ public class AuthService(DbExecutor db)
             "UPDATE app.users SET failed_login_attempts = 0, locked_until = NULL, last_login = @lastLogin WHERE id = @userId",
             new { userId, lastLogin = DateTime.UtcNow }
         );
+    }
+
+    public static string GenerateSecureToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(bytes)
+            .Replace("+", "-")
+            .Replace("/", "_")
+            .TrimEnd('=');
+    }
+
+    public static string HashToken(string token)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    public async Task<(bool Success, string? Error, string? Token, string? Username)> RequestPasswordResetAsync(string email)
+    {
+        try
+        {
+            var userRow = await db.ExecuteReaderAsync(
+                "SELECT id, username, is_active, locked_until FROM app.users WHERE email = @email",
+                reader => new
+                {
+                    UserId = reader.GetInt64(0),
+                    Username = reader.GetString(1),
+                    IsActive = reader.GetBoolean(2),
+                    LockedUntil = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3)
+                },
+                new { email }
+            );
+
+            if (userRow == null)
+            {
+                // Artificial delay to prevent timing-based email enumeration
+                await Task.Delay(Random.Shared.Next(100, 300));
+                return (true, null, null, null);
+            }
+
+            // Silently succeed for inactive/locked accounts (don't reveal state)
+            if (!userRow.IsActive ||
+                (userRow.LockedUntil.HasValue && userRow.LockedUntil.Value > DateTime.UtcNow))
+            {
+                return (true, null, null, null);
+            }
+
+            // Rate limit: max 3 requests per hour
+            var recentCount = await db.ExecuteAsync<long>(
+                @"SELECT COUNT(*) FROM app.password_reset_tokens
+                  WHERE user_id = @userId AND created_at > @cutoff",
+                new { userId = userRow.UserId, cutoff = DateTimeOffset.UtcNow.AddHours(-1) }
+            );
+
+            if (recentCount >= 3)
+            {
+                return (true, null, null, null);
+            }
+
+            // Invalidate all existing unused tokens for this user
+            await db.ExecuteNonQueryAsync(
+                @"UPDATE app.password_reset_tokens
+                  SET used_at = @now
+                  WHERE user_id = @userId AND used_at IS NULL",
+                new { userId = userRow.UserId, now = DateTimeOffset.UtcNow }
+            );
+
+            // Generate and store new token
+            var token = GenerateSecureToken();
+            var tokenHash = HashToken(token);
+            var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
+
+            await db.ExecuteNonQueryAsync(
+                @"INSERT INTO app.password_reset_tokens (user_id, token_hash, expires_at)
+                  VALUES (@userId, @tokenHash, @expiresAt)",
+                new { userId = userRow.UserId, tokenHash, expiresAt }
+            );
+
+            return (true, null, token, userRow.Username);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Password reset request failed: {ex.Message}", null, null);
+        }
+    }
+
+    public async Task<(bool Valid, string? Error)> ValidatePasswordResetTokenAsync(string token)
+    {
+        try
+        {
+            var tokenHash = HashToken(token);
+
+            var tokenRow = await db.ExecuteReaderAsync(
+                @"SELECT expires_at, used_at FROM app.password_reset_tokens
+                  WHERE token_hash = @tokenHash",
+                reader => new
+                {
+                    ExpiresAt = reader.GetFieldValue<DateTimeOffset>(0),
+                    UsedAt = reader.IsDBNull(1) ? (DateTimeOffset?)null : reader.GetFieldValue<DateTimeOffset>(1)
+                },
+                new { tokenHash }
+            );
+
+            if (tokenRow == null)
+                return (false, "Invalid or expired reset link. Please request a new one.");
+
+            if (tokenRow.UsedAt.HasValue)
+                return (false, "This reset link has already been used. Please request a new one.");
+
+            if (tokenRow.ExpiresAt < DateTimeOffset.UtcNow)
+                return (false, "This reset link has expired. Please request a new one.");
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Token validation failed: {ex.Message}");
+        }
+    }
+
+    public async Task<(bool Success, string? Error)> ResetPasswordAsync(string token, string newPassword)
+    {
+        try
+        {
+            var tokenHash = HashToken(token);
+
+            var tokenRow = await db.ExecuteReaderAsync(
+                @"SELECT id, user_id, expires_at, used_at FROM app.password_reset_tokens
+                  WHERE token_hash = @tokenHash",
+                reader => new
+                {
+                    Id = reader.GetInt64(0),
+                    UserId = reader.GetInt64(1),
+                    ExpiresAt = reader.GetFieldValue<DateTimeOffset>(2),
+                    UsedAt = reader.IsDBNull(3) ? (DateTimeOffset?)null : reader.GetFieldValue<DateTimeOffset>(3)
+                },
+                new { tokenHash }
+            );
+
+            if (tokenRow == null)
+                return (false, "Invalid or expired reset link. Please request a new one.");
+
+            if (tokenRow.UsedAt.HasValue)
+                return (false, "This reset link has already been used. Please request a new one.");
+
+            if (tokenRow.ExpiresAt < DateTimeOffset.UtcNow)
+                return (false, "This reset link has expired. Please request a new one.");
+
+            // Hash new password and update user
+            var passwordHash = HashPassword(newPassword);
+            await db.ExecuteNonQueryAsync(
+                @"UPDATE app.users
+                  SET password_hash = @passwordHash, failed_login_attempts = 0, locked_until = NULL
+                  WHERE id = @userId",
+                new { userId = tokenRow.UserId, passwordHash }
+            );
+
+            // Mark token as used
+            await db.ExecuteNonQueryAsync(
+                "UPDATE app.password_reset_tokens SET used_at = @now WHERE id = @tokenId",
+                new { tokenId = tokenRow.Id, now = DateTimeOffset.UtcNow }
+            );
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Password reset failed: {ex.Message}");
+        }
     }
 }

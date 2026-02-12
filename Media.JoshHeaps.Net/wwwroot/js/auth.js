@@ -336,9 +336,145 @@ function initRegisterForm() {
     });
 }
 
+// Password reset form validation
+function initPasswordResetForm() {
+    const form = document.getElementById('resetPasswordForm');
+    if (!form) return;
+
+    const passwordInput = document.getElementById('newPassword');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+
+    if (passwordInput) {
+        passwordInput.addEventListener('input', function() {
+            checkPasswordStrength(this.value);
+            if (this.value && validatePassword(this.value)) {
+                clearError(this);
+            }
+
+            if (confirmPasswordInput && confirmPasswordInput.value) {
+                if (confirmPasswordInput.value === this.value) {
+                    clearError(confirmPasswordInput);
+                } else {
+                    showError(confirmPasswordInput, 'Passwords do not match');
+                }
+            }
+        });
+
+        passwordInput.addEventListener('blur', function() {
+            if (!this.value) {
+                showError(this, 'Password is required');
+            } else if (!validatePassword(this.value)) {
+                showError(this, 'Password must be at least 8 characters');
+            } else {
+                clearError(this);
+            }
+        });
+    }
+
+    if (confirmPasswordInput) {
+        confirmPasswordInput.addEventListener('input', function() {
+            if (passwordInput && this.value === passwordInput.value) {
+                clearError(this);
+            }
+        });
+
+        confirmPasswordInput.addEventListener('blur', function() {
+            if (!this.value) {
+                showError(this, 'Please confirm your password');
+            } else if (passwordInput && this.value !== passwordInput.value) {
+                showError(this, 'Passwords do not match');
+            } else {
+                clearError(this);
+            }
+        });
+    }
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        let isValid = true;
+
+        if (!passwordInput.value) {
+            showError(passwordInput, 'Password is required');
+            isValid = false;
+        } else if (!validatePassword(passwordInput.value)) {
+            showError(passwordInput, 'Password must be at least 8 characters');
+            isValid = false;
+        } else {
+            clearError(passwordInput);
+        }
+
+        if (!confirmPasswordInput.value) {
+            showError(confirmPasswordInput, 'Please confirm your password');
+            isValid = false;
+        } else if (confirmPasswordInput.value !== passwordInput.value) {
+            showError(confirmPasswordInput, 'Passwords do not match');
+            isValid = false;
+        } else {
+            clearError(confirmPasswordInput);
+        }
+
+        if (isValid) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span> Resetting...';
+            form.submit();
+        }
+    });
+}
+
+// Request reset form validation
+function initRequestResetForm() {
+    const form = document.getElementById('requestResetForm');
+    if (!form) return;
+
+    const emailInput = document.getElementById('email');
+
+    if (emailInput) {
+        emailInput.addEventListener('blur', function() {
+            if (!this.value.trim()) {
+                showError(this, 'Email is required');
+            } else if (!validateEmail(this.value)) {
+                showError(this, 'Please enter a valid email address');
+            } else {
+                clearError(this);
+            }
+        });
+
+        emailInput.addEventListener('input', function() {
+            if (this.value.trim() && validateEmail(this.value)) {
+                clearError(this);
+            }
+        });
+    }
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        if (!emailInput.value.trim()) {
+            showError(emailInput, 'Email is required');
+            return;
+        }
+
+        if (!validateEmail(emailInput.value)) {
+            showError(emailInput, 'Please enter a valid email address');
+            return;
+        }
+
+        clearError(emailInput);
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner"></span> Sending...';
+        form.submit();
+    });
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initPasswordToggles();
     initLoginForm();
     initRegisterForm();
+    initPasswordResetForm();
+    initRequestResetForm();
 });

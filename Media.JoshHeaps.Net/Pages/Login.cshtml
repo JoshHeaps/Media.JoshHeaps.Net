@@ -60,10 +60,13 @@
                 <div class="invalid-feedback"></div>
             </div>
 
-            <div class="checkbox-wrapper">
-                <input type="checkbox" id="rememberMe" name="rememberMe"
-                       @(Model.RememberMe ? "checked" : "") />
-                <label for="rememberMe">Remember me</label>
+            <div class="form-options">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="rememberMe" name="rememberMe"
+                           @(Model.RememberMe ? "checked" : "") />
+                    <label for="rememberMe">Remember me</label>
+                </div>
+                <a href="/LoginHelp" class="forgot-password-link">Forgot password?</a>
             </div>
 
             <button type="submit" class="btn-primary">Sign In</button>

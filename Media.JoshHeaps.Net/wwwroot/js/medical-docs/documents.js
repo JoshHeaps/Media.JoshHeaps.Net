@@ -78,6 +78,18 @@
         select.value = currentVal;
     };
 
+    // --- Viewer ---
+
+    app.getViewerType = function (doc) {
+        if (doc.documentType === 'note') return 'text';
+        const mime = (doc.mimeType || '').toLowerCase();
+        if (mime.startsWith('image/')) return 'image';
+        if (mime.startsWith('audio/')) return 'audio';
+        if (mime.startsWith('text/')) return 'text';
+        if (mime === 'application/pdf') return 'pdf';
+        return null;
+    };
+
     // --- Documents ---
 
     app.loadDocuments = async function () {
@@ -135,6 +147,11 @@
 
             const aiStatusBadge = app.getAiStatusBadge(doc);
 
+            const viewerType = app.getViewerType(doc);
+            const viewBtn = viewerType
+                ? `<button onclick="event.stopPropagation(); medDocsView(${doc.id})">View</button>`
+                : '';
+
             const downloadBtn = doc.documentType === 'file'
                 ? `<button onclick="event.stopPropagation(); medDocsDownload(${doc.id}, '${app.escapeAttr(doc.fileName || 'download')}')">Download</button>`
                 : '';
@@ -166,6 +183,7 @@
                     </div>
                     <div class="doc-actions" onclick="event.stopPropagation()">
                         ${processBtn}
+                        ${viewBtn}
                         ${downloadBtn}
                         <button class="delete-btn" onclick="medDocsDelete(${doc.id})">Delete</button>
                     </div>
@@ -292,6 +310,79 @@
         a.click();
         document.body.removeChild(a);
     };
+
+    // --- Document Viewer ---
+
+    let currentBlobUrl = null;
+
+    window.medDocsView = async function (id) {
+        const doc = state.currentDocuments.find(d => d.id === id);
+        if (!doc) return;
+
+        const viewerType = app.getViewerType(doc);
+        if (!viewerType) return;
+
+        const overlay = document.getElementById('docViewerOverlay');
+        const title = document.getElementById('docViewerTitle');
+        const body = document.getElementById('docViewerBody');
+
+        title.textContent = doc.title || doc.fileName || 'Untitled';
+        body.innerHTML = '<div class="doc-viewer-loading">Loading...</div>';
+        overlay.style.display = '';
+        document.body.style.overflow = 'hidden';
+
+        if (doc.documentType === 'note') {
+            body.innerHTML = `<pre class="doc-viewer-text">${app.escapeHtml(doc.description || '')}</pre>`;
+            return;
+        }
+
+        try {
+            const res = await fetch(`${app.API}/documents/${id}/download`);
+            if (!res.ok) {
+                body.innerHTML = '<div class="doc-viewer-error">Failed to load document.</div>';
+                return;
+            }
+
+            const blob = await res.blob();
+            currentBlobUrl = URL.createObjectURL(blob);
+
+            if (viewerType === 'image') {
+                body.innerHTML = `<img class="doc-viewer-image" src="${currentBlobUrl}" alt="${app.escapeAttr(doc.title || doc.fileName || '')}" />`;
+            } else if (viewerType === 'audio') {
+                body.innerHTML = `<audio class="doc-viewer-audio" controls src="${currentBlobUrl}"></audio>`;
+            } else if (viewerType === 'pdf') {
+                body.innerHTML = `<iframe class="doc-viewer-pdf" src="${currentBlobUrl}"></iframe>`;
+            } else if (viewerType === 'text') {
+                const text = await blob.text();
+                body.innerHTML = `<pre class="doc-viewer-text">${app.escapeHtml(text)}</pre>`;
+                URL.revokeObjectURL(currentBlobUrl);
+                currentBlobUrl = null;
+            }
+        } catch {
+            body.innerHTML = '<div class="doc-viewer-error">Error loading document.</div>';
+        }
+    };
+
+    window.medDocsCloseViewer = function (event) {
+        if (event && event.target !== event.currentTarget) return;
+        const overlay = document.getElementById('docViewerOverlay');
+        overlay.style.display = 'none';
+        document.getElementById('docViewerBody').innerHTML = '';
+        document.body.style.overflow = '';
+        if (currentBlobUrl) {
+            URL.revokeObjectURL(currentBlobUrl);
+            currentBlobUrl = null;
+        }
+    };
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            const overlay = document.getElementById('docViewerOverlay');
+            if (overlay && overlay.style.display !== 'none') {
+                window.medDocsCloseViewer();
+            }
+        }
+    });
 
     window.medDocsDelete = async function (id) {
         if (!confirm('Delete this document? This cannot be undone.')) return;

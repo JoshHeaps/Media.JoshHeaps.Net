@@ -273,6 +273,18 @@
     </div>
 </div>
 
+<!-- Document Viewer Modal -->
+<div class="doc-viewer-overlay" id="docViewerOverlay" style="display:none" onclick="medDocsCloseViewer(event)">
+    <div class="doc-viewer-modal" onclick="event.stopPropagation()">
+        <div class="doc-viewer-header">
+            <span class="doc-viewer-title" id="docViewerTitle"></span>
+            <button class="doc-viewer-close" onclick="medDocsCloseViewer()" title="Close">&times;</button>
+        </div>
+        <div class="doc-viewer-body" id="docViewerBody">
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script src="~/js/medical-docs/state.js" asp-append-version="true"></script>
     <script src="~/js/medical-docs/tabs.js" asp-append-version="true"></script>

@@ -2,8 +2,8 @@
     const { state } = app;
 
     app.loadConditions = async function () {
-        if (!state.selectedPersonId) return;
-        const res = await fetch(`${app.API}/conditions?personId=${state.selectedPersonId}`);
+        const personParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
+        const res = await fetch(`${app.API}/conditions${personParam}`);
         if (!res.ok) return;
         const conditions = await res.json();
         app.renderConditions(conditions);
@@ -24,7 +24,7 @@
                 : '<span class="badge-inactive">Inactive</span>';
             return `<div class="condition-item" id="condition-${c.id}">
                 <div class="condition-info">
-                    <div class="condition-name">${app.escapeHtml(c.name)} ${statusBadge}</div>
+                    <div class="condition-name">${app.personBadge(c.personId)}${app.escapeHtml(c.name)} ${statusBadge}</div>
                     ${meta.length ? `<div class="condition-meta">${meta.join(' &middot; ')}</div>` : ''}
                     ${c.notes ? `<div class="condition-meta">${app.escapeHtml(c.notes)}</div>` : ''}
                 </div>
@@ -64,7 +64,8 @@
     };
 
     app.toggleConditionActive = async function (id, isActive) {
-        const res = await fetch(`${app.API}/conditions?personId=${state.selectedPersonId}`);
+        const toggleParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
+        const res = await fetch(`${app.API}/conditions${toggleParam}`);
         if (!res.ok) return;
         const conditions = await res.json();
         const condition = conditions.find(c => c.id === id);

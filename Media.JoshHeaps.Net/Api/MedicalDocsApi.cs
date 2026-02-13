@@ -112,7 +112,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 
     [HttpGet("documents/search")]
     public async Task<IActionResult> SearchDocuments(
-        [FromQuery] long personId,
+        [FromQuery] long? personId = null,
         [FromQuery] string? search = null,
         [FromQuery] string? classification = null,
         [FromQuery] string? documentType = null,
@@ -128,30 +128,24 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
-
-        if (personId <= 0)
-            return BadRequest(new { error = "personId is required" });
-        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
         if (limit < 1 || limit > 100) limit = 50;
         if (offset < 0) offset = 0;
 
-        var documents = await medicalDocsService.SearchDocumentsAsync(personId, search, classification, documentType, doctorId, tagId, conditionId, fromDate, toDate, aiProcessed, offset, limit);
+        var documents = await medicalDocsService.SearchDocumentsAsync(personId, search, classification, documentType, doctorId, tagId, conditionId, fromDate, toDate, aiProcessed, accessUserId: personId.HasValue ? null : userId, offset: offset, limit: limit);
         return Ok(documents);
     }
 
     [HttpGet("tags")]
-    public async Task<IActionResult> GetPersonTags([FromQuery] long personId)
+    public async Task<IActionResult> GetPersonTags([FromQuery] long? personId = null)
     {
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
-        if (personId <= 0)
-            return BadRequest(new { error = "personId is required" });
-        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
-
-        var tags = await medicalDocsService.GetPersonTagsAsync(personId);
+        var tags = await medicalDocsService.GetPersonTagsAsync(personId, accessUserId: personId.HasValue ? null : userId);
         return Ok(tags);
     }
 
@@ -334,13 +328,14 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
     // --- Doctors (shared, no per-person access check) ---
 
     [HttpGet("doctors")]
-    public async Task<IActionResult> GetDoctors()
+    public async Task<IActionResult> GetDoctors([FromQuery] long? personId = null)
     {
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
-        var doctors = await medicalDocsService.GetDoctorsAsync();
+        var doctors = await medicalDocsService.GetDoctorsAsync(personId, accessUserId: personId.HasValue ? null : userId);
         return Ok(doctors);
     }
 
@@ -350,11 +345,12 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasPersonAccess(userId.Value, request.PersonId)) return Forbid();
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new { error = "Name is required" });
 
-        var doctor = await medicalDocsService.CreateDoctorAsync(request.Name.Trim(), request.Specialty, request.Phone, request.Address, request.Notes);
+        var doctor = await medicalDocsService.CreateDoctorAsync(request.PersonId, request.Name.Trim(), request.Specialty, request.Phone, request.Address, request.Notes);
         if (doctor == null)
             return StatusCode(500, new { error = "Failed to create doctor" });
 
@@ -367,6 +363,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "doctor", id)) return Forbid();
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(new { error = "Name is required" });
@@ -383,6 +380,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (!await HasResourceAccess(userId.Value, "doctor", id)) return Forbid();
 
         var success = await medicalDocsService.DeleteDoctorAsync(id);
         if (!success) return NotFound(new { error = "Doctor not found" });
@@ -393,17 +391,14 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
     // --- Conditions ---
 
     [HttpGet("conditions")]
-    public async Task<IActionResult> GetConditions([FromQuery] long personId)
+    public async Task<IActionResult> GetConditions([FromQuery] long? personId = null)
     {
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
-        if (personId <= 0)
-            return BadRequest(new { error = "personId is required" });
-        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
-
-        var conditions = await medicalDocsService.GetConditionsAsync(personId);
+        var conditions = await medicalDocsService.GetConditionsAsync(personId, accessUserId: personId.HasValue ? null : userId);
         return Ok(conditions);
     }
 
@@ -461,17 +456,14 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
     // --- Prescriptions ---
 
     [HttpGet("prescriptions")]
-    public async Task<IActionResult> GetPrescriptions([FromQuery] long personId)
+    public async Task<IActionResult> GetPrescriptions([FromQuery] long? personId = null)
     {
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
-        if (personId <= 0)
-            return BadRequest(new { error = "personId is required" });
-        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
-
-        var prescriptions = await medicalDocsService.GetPrescriptionsAsync(personId);
+        var prescriptions = await medicalDocsService.GetPrescriptionsAsync(personId, accessUserId: personId.HasValue ? null : userId);
         return Ok(prescriptions);
     }
 
@@ -572,17 +564,14 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
     // --- Billing Providers ---
 
     [HttpGet("providers")]
-    public async Task<IActionResult> GetProviders([FromQuery] long personId)
+    public async Task<IActionResult> GetProviders([FromQuery] long? personId = null)
     {
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
-        if (personId <= 0)
-            return BadRequest(new { error = "personId is required" });
-        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
-
-        var providers = await medicalDocsService.GetProvidersAsync(personId);
+        var providers = await medicalDocsService.GetProvidersAsync(personId, accessUserId: personId.HasValue ? null : userId);
         return Ok(providers);
     }
 
@@ -686,17 +675,14 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
     // --- Bills ---
 
     [HttpGet("bills")]
-    public async Task<IActionResult> GetBills([FromQuery] long personId, [FromQuery] long? providerId = null)
+    public async Task<IActionResult> GetBills([FromQuery] long? personId = null, [FromQuery] long? providerId = null)
     {
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
-        if (personId <= 0)
-            return BadRequest(new { error = "personId is required" });
-        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
-
-        var bills = await medicalDocsService.GetBillsAsync(personId, providerId);
+        var bills = await medicalDocsService.GetBillsAsync(personId, providerId, accessUserId: personId.HasValue ? null : userId);
         return Ok(bills);
     }
 
@@ -834,20 +820,17 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
     // --- Timeline ---
 
     [HttpGet("timeline")]
-    public async Task<IActionResult> GetTimeline([FromQuery] long personId, [FromQuery] int offset = 0, [FromQuery] int limit = 100)
+    public async Task<IActionResult> GetTimeline([FromQuery] long? personId = null, [FromQuery] int offset = 0, [FromQuery] int limit = 100)
     {
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
-
-        if (personId <= 0)
-            return BadRequest(new { error = "personId is required" });
-        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
         if (limit < 1 || limit > 200) limit = 100;
         if (offset < 0) offset = 0;
 
-        var events = await medicalDocsService.GetTimelineAsync(personId, offset, limit);
+        var events = await medicalDocsService.GetTimelineAsync(personId, accessUserId: personId.HasValue ? null : userId, offset: offset, limit: limit);
         return Ok(events);
     }
 
@@ -889,17 +872,14 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
     }
 
     [HttpGet("bills/summary")]
-    public async Task<IActionResult> GetBillSummary([FromQuery] long personId)
+    public async Task<IActionResult> GetBillSummary([FromQuery] long? personId = null)
     {
         var userId = GetUserIdFromAuth();
         if (userId == null) return Unauthorized();
         if (!await HasMedicalAccess(userId.Value)) return Forbid();
+        if (personId.HasValue && !await HasPersonAccess(userId.Value, personId.Value)) return Forbid();
 
-        if (personId <= 0)
-            return BadRequest(new { error = "personId is required" });
-        if (!await HasPersonAccess(userId.Value, personId)) return Forbid();
-
-        var summary = await medicalDocsService.GetBillSummaryAsync(personId);
+        var summary = await medicalDocsService.GetBillSummaryAsync(personId, accessUserId: personId.HasValue ? null : userId);
         return Ok(summary);
     }
 
@@ -945,7 +925,7 @@ public class MedicalDocsApi(DbExecutor dbExecutor, MedicalDocsService medicalDoc
 public record CreatePersonRequest(string Name, DateTime? DateOfBirth = null, string? Notes = null);
 public record CreateNoteRequest(long PersonId, string Title, string? Description = null, DateTime? DocumentDate = null, string? Classification = null);
 public record UpdateDocumentRequest(string? Title = null, string? Description = null, DateTime? DocumentDate = null, string? Classification = null, long? DoctorId = null);
-public record CreateDoctorRequest(string Name, string? Specialty = null, string? Phone = null, string? Address = null, string? Notes = null);
+public record CreateDoctorRequest(long PersonId, string Name, string? Specialty = null, string? Phone = null, string? Address = null, string? Notes = null);
 public record CreateConditionRequest(long PersonId, string Name, DateTime? DiagnosedDate = null, string? Notes = null);
 public record UpdateConditionRequest(string Name, DateTime? DiagnosedDate = null, string? Notes = null, bool IsActive = true);
 public record CreatePrescriptionRequest(long PersonId, string MedicationName, string? Dosage = null, string? Frequency = null, long? DoctorId = null, DateTime? StartDate = null, string? Notes = null, string? RxNumber = null);

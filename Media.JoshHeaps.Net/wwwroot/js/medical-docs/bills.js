@@ -4,11 +4,10 @@
     // --- Providers ---
 
     app.loadBills = async function () {
-        if (!state.selectedPersonId) return;
-
+        const personParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
         const [providersRes, summaryRes] = await Promise.all([
-            fetch(`${app.API}/providers?personId=${state.selectedPersonId}`),
-            fetch(`${app.API}/bills/summary?personId=${state.selectedPersonId}`)
+            fetch(`${app.API}/providers${personParam}`),
+            fetch(`${app.API}/bills/summary${personParam}`)
         ]);
 
         if (providersRes.ok) {
@@ -78,7 +77,8 @@
         if (!container) return;
 
         // Fetch unassigned bills
-        const unassignedRes = await fetch(`${app.API}/bills?personId=${state.selectedPersonId}`);
+        const unassignedBillParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
+        const unassignedRes = await fetch(`${app.API}/bills${unassignedBillParam}`);
         let unassignedBills = [];
         if (unassignedRes.ok) {
             const allBills = await unassignedRes.json();
@@ -99,7 +99,7 @@
                     <div class="prescription-info">
                         <div class="prescription-name">
                             <span class="expand-btn" id="provider-expand-${p.id}">&#9654;</span>
-                            ${app.escapeHtml(p.name)}
+                            ${app.personBadge(p.personId)}${app.escapeHtml(p.name)}
                             <span class="bill-status ${statusClass}">${statusLabel}</span>
                         </div>
                         <div class="prescription-meta">
@@ -164,8 +164,9 @@
         const section = document.getElementById(`provider-details-${providerId}`);
         if (!section) return;
 
+        const billsParam = state.selectedPersonId ? `personId=${state.selectedPersonId}&` : '';
         const [billsRes, paymentsRes] = await Promise.all([
-            fetch(`${app.API}/bills?personId=${state.selectedPersonId}&providerId=${providerId}`),
+            fetch(`${app.API}/bills?${billsParam}providerId=${providerId}`),
             fetch(`${app.API}/providers/${providerId}/payments`)
         ]);
 
@@ -213,7 +214,7 @@
                 ${docNames ? `<div style="margin-left:18px;">${docNames}</div>` : ''}
                 <div id="bill-charges-${b.id}" style="display:none;margin-left:18px;margin-top:4px;">
                     <div class="charges-header">Charges</div>
-                    <div class="pickup-form">
+                    <div class="pickup-form" ${showForms}>
                         <div class="inline-form-row">
                             <input type="text" id="chargeDesc-${b.id}" placeholder="Description *" class="form-input" />
                             <input type="number" id="chargeAmount-${b.id}" placeholder="Amount *" class="form-input" step="0.01" min="0.01" />
@@ -221,8 +222,8 @@
                         </div>
                     </div>
                     <div class="charge-list" id="chargeList-${b.id}"></div>
-                    <div class="section-divider"></div>
-                    <div class="pickup-form">
+                    <div class="section-divider" ${showForms}></div>
+                    <div class="pickup-form" ${showForms}>
                         <div class="inline-form-row">
                             <select id="linkDoc-${b.id}" class="form-input">
                                 <option value="">Link document...</option>
@@ -248,10 +249,11 @@
             </div>`;
         }).join('');
 
+        const showForms = state.selectedPersonId ? '' : 'style="display:none"';
         section.innerHTML = `
             <div class="charges-section">
                 <div class="charges-header">Bills</div>
-                <div class="pickup-form">
+                <div class="pickup-form" ${showForms}>
                     <div class="inline-form-row">
                         <input type="number" id="newBillAmount-${providerId}" placeholder="Amount *" class="form-input" step="0.01" min="0.01" />
                         <input type="text" id="newBillSummary-${providerId}" placeholder="Summary" class="form-input" />
@@ -265,7 +267,7 @@
             <div class="section-divider"></div>
             <div class="payments-section">
                 <div class="charges-header">Payments</div>
-                <div class="pickup-form">
+                <div class="pickup-form" ${showForms}>
                     <div class="inline-form-row">
                         <input type="number" id="provPayAmount-${providerId}" placeholder="Amount *" class="form-input" step="0.01" min="0.01" />
                         <input type="date" id="provPayDate-${providerId}" class="form-input" title="Payment date" />
@@ -281,7 +283,8 @@
         const section = document.getElementById('provider-details-unassigned');
         if (!section) return;
 
-        const res = await fetch(`${app.API}/bills?personId=${state.selectedPersonId}`);
+        const unassignedParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
+        const res = await fetch(`${app.API}/bills${unassignedParam}`);
         if (!res.ok) return;
         const allBills = await res.json();
         const bills = allBills.filter(b => !b.providerId);
@@ -531,7 +534,8 @@
         if (!providerId) { alert('Select a provider'); return; }
 
         // Get current bill details first
-        const getRes = await fetch(`${app.API}/bills?personId=${state.selectedPersonId}`);
+        const assignParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
+        const getRes = await fetch(`${app.API}/bills${assignParam}`);
         if (!getRes.ok) return;
         const allBills = await getRes.json();
         const bill = allBills.find(b => b.id === billId);
@@ -561,9 +565,10 @@
 
     app.refreshProvider = async function (providerId) {
         // Refresh the summary and provider header, then reload details
+        const refreshParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
         const [providersRes, summaryRes] = await Promise.all([
-            fetch(`${app.API}/providers?personId=${state.selectedPersonId}`),
-            fetch(`${app.API}/bills/summary?personId=${state.selectedPersonId}`)
+            fetch(`${app.API}/providers${refreshParam}`),
+            fetch(`${app.API}/bills/summary${refreshParam}`)
         ]);
 
         if (providersRes.ok) {

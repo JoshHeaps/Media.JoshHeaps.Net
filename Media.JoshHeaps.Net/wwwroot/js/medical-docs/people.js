@@ -10,7 +10,10 @@
 
     app.renderPeople = function () {
         const container = document.getElementById('peopleList');
-        container.innerHTML = state.people.map(p =>
+        const allPill = `<div class="person-pill-row">
+            <button class="person-pill ${!state.selectedPersonId ? 'active' : ''}" onclick="medDocsSelectAll()">All</button>
+        </div>`;
+        container.innerHTML = allPill + state.people.map(p =>
             `<div class="person-pill-row">
                 <button class="person-pill ${p.id === state.selectedPersonId ? 'active' : ''}" onclick="medDocsSelectPerson(${p.id})">${app.escapeHtml(p.name)}</button>
                 <button class="person-share-btn" onclick="medDocsOpenShareModal(${p.id}, event)" title="Share access">
@@ -47,6 +50,7 @@
         state.selectedPersonId = personId;
         app.renderPeople();
 
+        document.querySelector('.medical-main').classList.remove('all-mode');
         document.getElementById('summaryCards').style.display = '';
         document.getElementById('filterBar').style.display = '';
         app.updateTabStates();
@@ -58,6 +62,32 @@
         app.populateFilterDoctorDropdown();
 
         app.loadDocuments();
+        app.loadDoctors();
+        app.loadConditions();
+        app.loadPrescriptions();
+        app.loadBills();
+        app.loadTimeline();
+
+        app.switchMainTab('documents');
+    };
+
+    app.selectAll = function () {
+        state.selectedPersonId = null;
+        app.renderPeople();
+
+        document.querySelector('.medical-main').classList.add('all-mode');
+        document.getElementById('summaryCards').style.display = '';
+        document.getElementById('filterBar').style.display = '';
+        app.updateTabStates();
+
+        app.clearFilters(false);
+
+        app.loadFilterTags();
+        app.loadFilterConditions();
+        app.populateFilterDoctorDropdown();
+
+        app.loadDocuments();
+        app.loadDoctors();
         app.loadConditions();
         app.loadPrescriptions();
         app.loadBills();
@@ -144,6 +174,7 @@
     };
 
     window.medDocsSelectPerson = (id) => app.selectPerson(id);
+    window.medDocsSelectAll = () => app.selectAll();
     window.medDocsOpenShareModal = (id, event) => app.openShareModal(id, event);
     window.medDocsCloseShareModal = (event) => app.closeShareModal(event);
     window.medDocsGrantAccess = () => app.grantAccess();

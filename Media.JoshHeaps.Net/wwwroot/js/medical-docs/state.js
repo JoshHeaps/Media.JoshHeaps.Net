@@ -73,5 +73,11 @@ window.MedDocs = {
     updateSummaryCount(id, count) {
         const el = document.getElementById(id);
         if (el) el.textContent = count;
+    },
+
+    personBadge(personId) {
+        if (this.state.selectedPersonId) return '';
+        const person = this.state.people.find(p => p.id === personId);
+        return person ? `<span class="person-badge">${this.escapeHtml(person.name)}</span>` : '';
     }
 };

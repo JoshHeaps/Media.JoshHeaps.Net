@@ -5,7 +5,7 @@
 
     app.buildFilterQuery = function () {
         const params = new URLSearchParams();
-        params.set('personId', state.selectedPersonId);
+        if (state.selectedPersonId) params.set('personId', state.selectedPersonId);
 
         const search = document.getElementById('filterSearch').value.trim();
         if (search) params.set('search', search);
@@ -47,8 +47,8 @@
     };
 
     app.loadFilterTags = async function () {
-        if (!state.selectedPersonId) return;
-        const res = await fetch(`${app.API}/tags?personId=${state.selectedPersonId}`);
+        const personParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
+        const res = await fetch(`${app.API}/tags${personParam}`);
         if (!res.ok) return;
         const tags = await res.json();
         const select = document.getElementById('filterTag');
@@ -59,8 +59,8 @@
     };
 
     app.loadFilterConditions = async function () {
-        if (!state.selectedPersonId) return;
-        const res = await fetch(`${app.API}/conditions?personId=${state.selectedPersonId}`);
+        const personParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
+        const res = await fetch(`${app.API}/conditions${personParam}`);
         if (!res.ok) return;
         const conditions = await res.json();
         const select = document.getElementById('filterCondition');
@@ -93,8 +93,6 @@
     // --- Documents ---
 
     app.loadDocuments = async function () {
-        if (!state.selectedPersonId) return;
-
         const query = app.buildFilterQuery();
         const res = await fetch(`${app.API}/documents/search?${query}`);
         if (!res.ok) return;
@@ -172,7 +170,7 @@
                     <div class="doc-info">
                         <div class="doc-title">
                             <span class="expand-btn" id="doc-expand-${doc.id}">&#9654;</span>
-                            ${app.escapeHtml(displayTitle)}
+                            ${app.personBadge(doc.personId)}${app.escapeHtml(displayTitle)}
                         </div>
                         <div class="doc-meta">
                             <span>${meta.join(' &middot; ')}</span>

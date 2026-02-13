@@ -1,7 +1,6 @@
 (function (app) {
     document.addEventListener('DOMContentLoaded', async function () {
         await app.loadPeople();
-        await app.loadDoctors();
 
         // Add person
         document.getElementById('addPersonBtn').addEventListener('click', () => app.addPerson());
@@ -49,8 +48,7 @@
             document.getElementById(id).addEventListener('change', () => app.loadDocuments());
         });
 
-        // Default state
-        app.switchMainTab('doctors');
-        app.updateTabStates();
+        // Default: load all-persons view
+        app.selectAll();
     });
 })(MedDocs);

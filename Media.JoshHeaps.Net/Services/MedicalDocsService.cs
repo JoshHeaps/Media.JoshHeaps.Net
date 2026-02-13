@@ -155,6 +155,7 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
             var sql = resourceType switch
             {
                 "document" => "SELECT person_id FROM app.medical_documents WHERE id = @id",
+                "doctor" => "SELECT person_id FROM app.medical_doctors WHERE id = @id",
                 "condition" => "SELECT person_id FROM app.medical_conditions WHERE id = @id",
                 "prescription" => "SELECT person_id FROM app.medical_prescriptions WHERE id = @id",
                 "pickup" => "SELECT p.person_id FROM app.medical_prescription_pickups pk JOIN app.medical_prescriptions p ON pk.prescription_id = p.id WHERE pk.id = @id",
@@ -297,11 +298,14 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
         }
     }
 
-    public async Task<List<MedicalDocument>> SearchDocumentsAsync(long personId, string? search = null, string? classification = null, string? documentType = null, long? doctorId = null, long? tagId = null, long? conditionId = null, DateTime? fromDate = null, DateTime? toDate = null, bool? aiProcessed = null, int offset = 0, int limit = 50)
+    public async Task<List<MedicalDocument>> SearchDocumentsAsync(long? personId = null, string? search = null, string? classification = null, string? documentType = null, long? doctorId = null, long? tagId = null, long? conditionId = null, DateTime? fromDate = null, DateTime? toDate = null, bool? aiProcessed = null, long? accessUserId = null, int offset = 0, int limit = 50)
     {
         try
         {
-            var conditions = new List<string> { "person_id = @personId" };
+            var personFilter = personId.HasValue
+                ? "person_id = @personId"
+                : "person_id IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
+            var conditions = new List<string> { personFilter };
 
             if (!string.IsNullOrWhiteSpace(search))
                 conditions.Add("(title ILIKE @search OR description ILIKE @search OR extracted_text ILIKE @search)");
@@ -339,7 +343,8 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
 
             return await db.ExecuteListReaderAsync(query, MapDocument, new
             {
-                personId,
+                personId = personId ?? 0L,
+                accessUserId = accessUserId ?? 0L,
                 search = !string.IsNullOrWhiteSpace(search) ? $"%{search}%" : (string?)null,
                 classification,
                 documentType,
@@ -360,16 +365,20 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
         }
     }
 
-    public async Task<List<MedicalTag>> GetPersonTagsAsync(long personId)
+    public async Task<List<MedicalTag>> GetPersonTagsAsync(long? personId = null, long? accessUserId = null)
     {
         try
         {
+            var personFilter = personId.HasValue
+                ? "d.person_id = @personId"
+                : "d.person_id IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
+
             return await db.ExecuteListReaderAsync(
-                @"SELECT DISTINCT t.id, t.name, t.created_at
+                $@"SELECT DISTINCT t.id, t.name, t.created_at
                   FROM app.medical_tags t
                   JOIN app.medical_document_tags dt ON dt.tag_id = t.id
                   JOIN app.medical_documents d ON dt.document_id = d.id
-                  WHERE d.person_id = @personId
+                  WHERE {personFilter}
                   ORDER BY t.name",
                 reader => new MedicalTag
                 {
@@ -377,7 +386,7 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     Name = reader.GetString(1),
                     CreatedAt = reader.GetDateTime(2)
                 },
-                new { personId });
+                new { personId = personId ?? 0L, accessUserId = accessUserId ?? 0L });
         }
         catch (Exception ex)
         {
@@ -497,39 +506,45 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
 
     // --- Doctors ---
 
-    public async Task<List<MedicalDoctor>> GetDoctorsAsync()
+    public async Task<List<MedicalDoctor>> GetDoctorsAsync(long? personId = null, long? accessUserId = null)
     {
         try
         {
+            var personFilter = personId.HasValue
+                ? "person_id = @personId"
+                : "person_id IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
+
             return await db.ExecuteListReaderAsync(
-                "SELECT id, name, specialty, phone, address, notes, created_at, updated_at FROM app.medical_doctors ORDER BY name",
+                $"SELECT id, person_id, name, specialty, phone, address, notes, created_at, updated_at FROM app.medical_doctors WHERE {personFilter} ORDER BY name",
                 reader => new MedicalDoctor
                 {
                     Id = reader.GetInt64(0),
-                    Name = reader.GetString(1),
-                    Specialty = reader.IsDBNull(2) ? null : reader.GetString(2),
-                    Phone = reader.IsDBNull(3) ? null : reader.GetString(3),
-                    Address = reader.IsDBNull(4) ? null : reader.GetString(4),
-                    Notes = reader.IsDBNull(5) ? null : reader.GetString(5),
-                    CreatedAt = reader.GetDateTime(6),
-                    UpdatedAt = reader.GetDateTime(7)
-                });
+                    PersonId = reader.GetInt64(1),
+                    Name = reader.GetString(2),
+                    Specialty = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    Phone = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    Address = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    Notes = reader.IsDBNull(6) ? null : reader.GetString(6),
+                    CreatedAt = reader.GetDateTime(7),
+                    UpdatedAt = reader.GetDateTime(8)
+                },
+                new { personId = personId ?? 0L, accessUserId = accessUserId ?? 0L });
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to get doctors");
+            logger.LogError(ex, "Failed to get doctors for person {PersonId}", personId);
             return [];
         }
     }
 
-    public async Task<MedicalDoctor?> CreateDoctorAsync(string name, string? specialty = null, string? phone = null, string? address = null, string? notes = null)
+    public async Task<MedicalDoctor?> CreateDoctorAsync(long personId, string name, string? specialty = null, string? phone = null, string? address = null, string? notes = null)
     {
         try
         {
             var now = DateTime.UtcNow;
             return await db.ExecuteReaderAsync(
-                @"INSERT INTO app.medical_doctors (name, specialty, phone, address, notes, created_at, updated_at)
-                  VALUES (@name, @specialty, @phone, @address, @notes, @createdAt, @updatedAt)
+                @"INSERT INTO app.medical_doctors (person_id, name, specialty, phone, address, notes, created_at, updated_at)
+                  VALUES (@personId, @name, @specialty, @phone, @address, @notes, @createdAt, @updatedAt)
                   RETURNING id, name, specialty, phone, address, notes, created_at, updated_at",
                 reader => new MedicalDoctor
                 {
@@ -542,11 +557,11 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     CreatedAt = reader.GetDateTime(6),
                     UpdatedAt = reader.GetDateTime(7)
                 },
-                new { name, specialty, phone, address, notes, createdAt = now, updatedAt = now });
+                new { personId, name, specialty, phone, address, notes, createdAt = now, updatedAt = now });
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to create doctor");
+            logger.LogError(ex, "Failed to create doctor for person {PersonId}", personId);
             return null;
         }
     }
@@ -610,12 +625,16 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
 
     // --- Conditions ---
 
-    public async Task<List<MedicalCondition>> GetConditionsAsync(long personId)
+    public async Task<List<MedicalCondition>> GetConditionsAsync(long? personId = null, long? accessUserId = null)
     {
         try
         {
+            var personFilter = personId.HasValue
+                ? "person_id = @personId"
+                : "person_id IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
+
             return await db.ExecuteListReaderAsync(
-                "SELECT id, person_id, name, diagnosed_date, notes, is_active, created_at, updated_at FROM app.medical_conditions WHERE person_id = @personId ORDER BY name",
+                $"SELECT id, person_id, name, diagnosed_date, notes, is_active, created_at, updated_at FROM app.medical_conditions WHERE {personFilter} ORDER BY name",
                 reader => new MedicalCondition
                 {
                     Id = reader.GetInt64(0),
@@ -627,7 +646,7 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     CreatedAt = reader.GetDateTime(6),
                     UpdatedAt = reader.GetDateTime(7)
                 },
-                new { personId });
+                new { personId = personId ?? 0L, accessUserId = accessUserId ?? 0L });
         }
         catch (Exception ex)
         {
@@ -698,17 +717,21 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
 
     // --- Prescriptions ---
 
-    public async Task<List<MedicalPrescription>> GetPrescriptionsAsync(long personId)
+    public async Task<List<MedicalPrescription>> GetPrescriptionsAsync(long? personId = null, long? accessUserId = null)
     {
         try
         {
+            var personFilter = personId.HasValue
+                ? "p.person_id = @personId"
+                : "p.person_id IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
+
             return await db.ExecuteListReaderAsync(
-                @"SELECT p.id, p.person_id, p.doctor_id, p.medication_name, p.dosage, p.frequency, p.is_active, p.start_date, p.end_date, p.notes, p.created_at, p.updated_at, p.rx_number,
+                $@"SELECT p.id, p.person_id, p.doctor_id, p.medication_name, p.dosage, p.frequency, p.is_active, p.start_date, p.end_date, p.notes, p.created_at, p.updated_at, p.rx_number,
                          d.name AS doctor_name,
                          (SELECT MAX(pk.pickup_date) FROM app.medical_prescription_pickups pk WHERE pk.prescription_id = p.id) AS last_pickup
                   FROM app.medical_prescriptions p
                   LEFT JOIN app.medical_doctors d ON p.doctor_id = d.id
-                  WHERE p.person_id = @personId
+                  WHERE {personFilter}
                   ORDER BY p.medication_name",
                 reader => new MedicalPrescription
                 {
@@ -728,7 +751,7 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     DoctorName = reader.IsDBNull(13) ? null : reader.GetString(13),
                     LastPickupDate = reader.IsDBNull(14) ? null : reader.GetDateTime(14)
                 },
-                new { personId });
+                new { personId = personId ?? 0L, accessUserId = accessUserId ?? 0L });
         }
         catch (Exception ex)
         {
@@ -990,12 +1013,13 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
         }
     }
 
-    public async Task<MedicalDoctor?> FindOrCreateDoctorByNameAsync(string doctorName)
+    public async Task<MedicalDoctor?> FindOrCreateDoctorByNameAsync(long personId, string doctorName, MedicalAiService aiService)
     {
         try
         {
+            // Step 1: Exact match
             var existing = await db.ExecuteReaderAsync(
-                "SELECT id, name, specialty, phone, address, notes, created_at, updated_at FROM app.medical_doctors WHERE LOWER(name) = LOWER(@name) LIMIT 1",
+                "SELECT id, name, specialty, phone, address, notes, created_at, updated_at FROM app.medical_doctors WHERE person_id = @personId AND LOWER(name) = LOWER(@name) LIMIT 1",
                 reader => new MedicalDoctor
                 {
                     Id = reader.GetInt64(0),
@@ -1007,15 +1031,29 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     CreatedAt = reader.GetDateTime(6),
                     UpdatedAt = reader.GetDateTime(7)
                 },
-                new { name = doctorName });
+                new { personId, name = doctorName });
 
             if (existing != null) return existing;
 
-            return await CreateDoctorAsync(doctorName);
+            // Step 2: AI fuzzy match
+            var allDoctors = await GetDoctorsAsync(personId);
+            if (allDoctors.Count > 0)
+            {
+                var existingNames = allDoctors.Select(d => d.Name).ToList();
+                var matchedName = await aiService.FuzzyMatchDoctorAsync(doctorName, existingNames);
+                if (matchedName != null)
+                {
+                    var matched = allDoctors.FirstOrDefault(d => string.Equals(d.Name, matchedName, StringComparison.OrdinalIgnoreCase));
+                    if (matched != null) return matched;
+                }
+            }
+
+            // Step 3: Create new
+            return await CreateDoctorAsync(personId, doctorName);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to find or create doctor by name \"{DoctorName}\"", doctorName);
+            logger.LogError(ex, "Failed to find or create doctor by name \"{DoctorName}\" for person {PersonId}", doctorName, personId);
             return null;
         }
     }
@@ -1032,7 +1070,7 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
         var docName = rxInfo.DoctorName ?? doctorName;
         if (!string.IsNullOrWhiteSpace(docName))
         {
-            var doctor = await FindOrCreateDoctorByNameAsync(docName.Trim());
+            var doctor = await FindOrCreateDoctorByNameAsync(personId, docName.Trim(), aiService);
             doctorId = doctor?.Id;
         }
 
@@ -1198,18 +1236,22 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
 
     // --- Billing Providers ---
 
-    public async Task<List<MedicalBillingProvider>> GetProvidersAsync(long personId)
+    public async Task<List<MedicalBillingProvider>> GetProvidersAsync(long? personId = null, long? accessUserId = null)
     {
         try
         {
+            var personFilter = personId.HasValue
+                ? "p.person_id = @personId"
+                : "p.person_id IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
+
             return await db.ExecuteListReaderAsync(
-                @"SELECT p.id, p.name, p.person_id, p.notes, p.created_at, p.updated_at,
+                $@"SELECT p.id, p.name, p.person_id, p.notes, p.created_at, p.updated_at,
                          COALESCE(SUM(b.total_amount), 0) AS total_charged,
                          COALESCE((SELECT SUM(pp.amount) FROM app.medical_provider_payments pp WHERE pp.provider_id = p.id), 0) AS total_paid,
                          COUNT(DISTINCT b.id) AS bill_count
                   FROM app.medical_billing_providers p
                   LEFT JOIN app.medical_bills b ON b.provider_id = p.id
-                  WHERE p.person_id = @personId
+                  WHERE {personFilter}
                   GROUP BY p.id, p.name, p.person_id, p.notes, p.created_at, p.updated_at
                   ORDER BY p.name",
                 reader => new MedicalBillingProvider
@@ -1224,7 +1266,7 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     TotalPaid = reader.GetDecimal(7),
                     BillCount = reader.GetInt32(8)
                 },
-                new { personId });
+                new { personId = personId ?? 0L, accessUserId = accessUserId ?? 0L });
         }
         catch (Exception ex)
         {
@@ -1480,10 +1522,13 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
 
     // --- Bills ---
 
-    public async Task<List<MedicalBill>> GetBillsAsync(long personId, long? providerId = null)
+    public async Task<List<MedicalBill>> GetBillsAsync(long? personId = null, long? providerId = null, long? accessUserId = null)
     {
         try
         {
+            var personFilter = personId.HasValue
+                ? "b.person_id = @personId"
+                : "b.person_id IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
             var providerFilter = providerId.HasValue ? "AND b.provider_id = @providerId" : "";
 
             var query = $@"SELECT b.id, b.person_id, b.total_amount, b.summary, b.category, b.bill_date, b.doctor_id, b.provider_id, b.source, b.created_at, b.updated_at,
@@ -1496,10 +1541,10 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                            FROM app.medical_bills b
                            LEFT JOIN app.medical_doctors d ON b.doctor_id = d.id
                            LEFT JOIN app.medical_billing_providers bp ON b.provider_id = bp.id
-                           WHERE b.person_id = @personId {providerFilter}
+                           WHERE {personFilter} {providerFilter}
                            ORDER BY b.bill_date DESC NULLS LAST, b.created_at DESC";
 
-            return await db.ExecuteListReaderAsync(query, MapBill, new { personId, providerId });
+            return await db.ExecuteListReaderAsync(query, MapBill, new { personId = personId ?? 0L, accessUserId = accessUserId ?? 0L, providerId });
         }
         catch (Exception ex)
         {
@@ -1619,26 +1664,34 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
 
     // --- Bill Summary ---
 
-    public async Task<BillSummary> GetBillSummaryAsync(long personId)
+    public async Task<BillSummary> GetBillSummaryAsync(long? personId = null, long? accessUserId = null)
     {
         try
         {
+            var personFilter = personId.HasValue
+                ? "b.person_id = @personId"
+                : "b.person_id IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
+            var providerPersonFilter = personId.HasValue
+                ? "prov.person_id = @personId"
+                : "prov.person_id IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
+            var filterParams = new { personId = personId ?? 0L, accessUserId = accessUserId ?? 0L };
+
             var totals = await db.ExecuteReaderAsync(
-                @"SELECT COALESCE(SUM(b.total_amount), 0),
+                $@"SELECT COALESCE(SUM(b.total_amount), 0),
                          COALESCE((SELECT SUM(pp.amount) FROM app.medical_provider_payments pp
                                    JOIN app.medical_billing_providers prov ON pp.provider_id = prov.id
-                                   WHERE prov.person_id = @personId), 0)
+                                   WHERE {providerPersonFilter}), 0)
                   FROM app.medical_bills b
-                  WHERE b.person_id = @personId",
+                  WHERE {personFilter}",
                 reader => new { Charged = reader.GetDecimal(0), TotalPaid = reader.GetDecimal(1) },
-                new { personId });
+                filterParams);
 
             var byYear = await db.ExecuteListReaderAsync(
-                @"SELECT EXTRACT(YEAR FROM COALESCE(b.bill_date, b.created_at))::int AS year,
+                $@"SELECT EXTRACT(YEAR FROM COALESCE(b.bill_date, b.created_at))::int AS year,
                          SUM(b.total_amount),
                          COUNT(b.id)
                   FROM app.medical_bills b
-                  WHERE b.person_id = @personId
+                  WHERE {personFilter}
                   GROUP BY EXTRACT(YEAR FROM COALESCE(b.bill_date, b.created_at))::int
                   ORDER BY year DESC",
                 reader => new YearBreakdown
@@ -1647,15 +1700,15 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     Total = reader.GetDecimal(1),
                     Count = reader.GetInt32(2)
                 },
-                new { personId });
+                filterParams);
 
             var byProvider = await db.ExecuteListReaderAsync(
-                @"SELECT COALESCE(prov.name, 'Unassigned'),
+                $@"SELECT COALESCE(prov.name, 'Unassigned'),
                          COALESCE(SUM(b.total_amount), 0),
                          COUNT(b.id)
                   FROM app.medical_bills b
                   LEFT JOIN app.medical_billing_providers prov ON b.provider_id = prov.id
-                  WHERE b.person_id = @personId
+                  WHERE {personFilter}
                   GROUP BY COALESCE(prov.name, 'Unassigned')
                   ORDER BY COALESCE(SUM(b.total_amount), 0) DESC",
                 reader => new ProviderBreakdown
@@ -1664,7 +1717,7 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                     Total = reader.GetDecimal(1),
                     Count = reader.GetInt32(2)
                 },
-                new { personId });
+                filterParams);
 
             var charged = totals?.Charged ?? 0;
             var totalPaid = totals?.TotalPaid ?? 0;
@@ -2284,30 +2337,34 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
 
     // --- Timeline ---
 
-    public async Task<List<TimelineEvent>> GetTimelineAsync(long personId, int offset = 0, int limit = 100)
+    public async Task<List<TimelineEvent>> GetTimelineAsync(long? personId = null, long? accessUserId = null, int offset = 0, int limit = 100)
     {
         try
         {
+            var personFilter = personId.HasValue
+                ? "= @personId"
+                : "IN (SELECT person_id FROM app.medical_people_access WHERE user_id = @accessUserId)";
+
             return await db.ExecuteListReaderAsync(
-                @"SELECT event_type, id, label, detail, sub_type, event_date, doctor_id, created_at
+                $@"SELECT event_type, id, person_id, label, detail, sub_type, event_date, doctor_id, created_at
                   FROM (
-                      SELECT 'document' AS event_type, d.id, COALESCE(d.title, d.file_name) AS label, d.description AS detail,
+                      SELECT 'document' AS event_type, d.id, d.person_id, COALESCE(d.title, d.file_name) AS label, d.description AS detail,
                              d.classification AS sub_type, d.document_date AS event_date, d.doctor_id, d.created_at
-                      FROM app.medical_documents d WHERE d.person_id = @personId
+                      FROM app.medical_documents d WHERE d.person_id {personFilter}
                       UNION ALL
-                      SELECT 'condition', c.id, c.name, c.notes,
+                      SELECT 'condition', c.id, c.person_id, c.name, c.notes,
                              CASE WHEN c.is_active THEN 'active' ELSE 'resolved' END, c.diagnosed_date, NULL, c.created_at
-                      FROM app.medical_conditions c WHERE c.person_id = @personId
+                      FROM app.medical_conditions c WHERE c.person_id {personFilter}
                       UNION ALL
-                      SELECT 'prescription', p.id, p.medication_name, CONCAT_WS(' - ', p.dosage, p.frequency),
+                      SELECT 'prescription', p.id, p.person_id, p.medication_name, CONCAT_WS(' - ', p.dosage, p.frequency),
                              CASE WHEN p.is_active THEN 'active' ELSE 'ended' END, p.start_date, p.doctor_id, p.created_at
-                      FROM app.medical_prescriptions p WHERE p.person_id = @personId
+                      FROM app.medical_prescriptions p WHERE p.person_id {personFilter}
                       UNION ALL
-                      SELECT 'bill', b.id, b.summary, bp.name,
+                      SELECT 'bill', b.id, b.person_id, b.summary, bp.name,
                              b.category, b.bill_date, b.doctor_id, b.created_at
                       FROM app.medical_bills b
                       LEFT JOIN app.medical_billing_providers bp ON b.provider_id = bp.id
-                      WHERE b.person_id = @personId
+                      WHERE b.person_id {personFilter}
                   ) AS timeline
                   ORDER BY COALESCE(event_date, created_at) DESC
                   LIMIT @limit OFFSET @offset",
@@ -2315,14 +2372,15 @@ public class MedicalDocsService(DbExecutor db, IWebHostEnvironment environment, 
                 {
                     EventType = reader.GetString(0),
                     Id = reader.GetInt64(1),
-                    Label = reader.IsDBNull(2) ? null : reader.GetString(2),
-                    Detail = reader.IsDBNull(3) ? null : reader.GetString(3),
-                    SubType = reader.IsDBNull(4) ? null : reader.GetString(4),
-                    EventDate = reader.IsDBNull(5) ? null : reader.GetDateTime(5),
-                    DoctorId = reader.IsDBNull(6) ? null : reader.GetInt64(6),
-                    CreatedAt = reader.GetDateTime(7)
+                    PersonId = reader.GetInt64(2),
+                    Label = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    Detail = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    SubType = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    EventDate = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                    DoctorId = reader.IsDBNull(7) ? null : reader.GetInt64(7),
+                    CreatedAt = reader.GetDateTime(8)
                 },
-                new { personId, limit, offset });
+                new { personId = personId ?? 0L, accessUserId = accessUserId ?? 0L, limit, offset });
         }
         catch (Exception ex)
         {

@@ -2,8 +2,6 @@
     const { state } = app;
 
     app.switchMainTab = function (tabName) {
-        if (!state.selectedPersonId && tabName !== 'doctors') return;
-
         state.activeTab = tabName;
 
         document.querySelectorAll('.main-tab').forEach(btn => {
@@ -32,16 +30,8 @@
     };
 
     app.updateTabStates = function () {
-        var personTabs = ['documents', 'conditions', 'prescriptions', 'bills', 'timeline'];
-        personTabs.forEach(function (tab) {
-            var btn = document.querySelector('.main-tab[data-tab="' + tab + '"]');
-            if (btn) {
-                if (state.selectedPersonId) {
-                    btn.classList.remove('disabled');
-                } else {
-                    btn.classList.add('disabled');
-                }
-            }
+        document.querySelectorAll('.main-tab.disabled').forEach(function (btn) {
+            btn.classList.remove('disabled');
         });
     };
 

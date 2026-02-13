@@ -123,7 +123,7 @@ public class MedicalAiService
         {
             try
             {
-                var doctor = await medicalDocsService.FindOrCreateDoctorByNameAsync(doctorName.Trim());
+                var doctor = await medicalDocsService.FindOrCreateDoctorByNameAsync(doc.PersonId, doctorName.Trim(), this);
                 doctorId = doctor?.Id;
             }
             catch (Exception ex)
@@ -627,6 +627,42 @@ Consider abbreviations, slight misspellings, and variations (e.g., ""Intermounta
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Fuzzy provider matching failed for \"{ExtractedName}\"", extractedName);
+            return null;
+        }
+    }
+
+    public async Task<string?> FuzzyMatchDoctorAsync(string extractedName, List<string> existingDoctorNames)
+    {
+        try
+        {
+            var doctorList = string.Join("\n", existingDoctorNames.Select(n => $"  - {n}"));
+
+            var systemPrompt = @"You are matching a doctor name extracted from a medical document against a list of known doctors for a patient. Return ONLY a JSON object with:
+- ""matchedName"": the exact string from the existing list that matches, or null if no match
+- ""confidence"": ""high"", ""medium"", or ""low""
+
+Consider abbreviations, titles, and variations (e.g., ""Dr. John Smith"" matches ""John Smith"", ""J. Smith MD"" matches ""John Smith"", ""Smith, John"" matches ""John Smith""). Only return a match with medium or high confidence.";
+
+            var userPrompt = $"Extracted doctor name: \"{extractedName}\"\n\nExisting doctors:\n{doctorList}";
+
+            var response = await CallClaudeCliAsync(systemPrompt, userPrompt, HaikuModel);
+            if (response == null) return null;
+
+            var json = ExtractJson(response);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var matchedName = root.TryGetProperty("matchedName", out var mn) && mn.ValueKind == JsonValueKind.String ? mn.GetString() : null;
+            var confidence = root.TryGetProperty("confidence", out var conf) ? conf.GetString() : "low";
+
+            if (matchedName != null && confidence != "low")
+                return matchedName;
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fuzzy doctor matching failed for \"{ExtractedName}\"", extractedName);
             return null;
         }
     }

@@ -2,8 +2,8 @@
     const { state } = app;
 
     app.loadPrescriptions = async function () {
-        if (!state.selectedPersonId) return;
-        const res = await fetch(`${app.API}/prescriptions?personId=${state.selectedPersonId}`);
+        const personParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
+        const res = await fetch(`${app.API}/prescriptions${personParam}`);
         if (!res.ok) return;
         const prescriptions = await res.json();
         state.currentPrescriptions = prescriptions;
@@ -33,7 +33,7 @@
                     <div class="prescription-info">
                         <div class="prescription-name">
                             <span class="expand-btn" id="expand-${rx.id}">&#9654;</span>
-                            ${app.escapeHtml(rx.medicationName)} ${statusBadge}
+                            ${app.personBadge(rx.personId)}${app.escapeHtml(rx.medicationName)} ${statusBadge}
                         </div>
                         <div class="prescription-meta">${meta.map(m => app.escapeHtml(m)).join(' &middot; ')}</div>
                         <div class="prescription-meta">Last pickup: ${app.escapeHtml(lastPickup)}</div>
@@ -44,7 +44,7 @@
                     </div>
                 </div>
                 <div class="pickup-section" id="pickups-${rx.id}" style="display: none;">
-                    <div class="pickup-form">
+                    ${state.selectedPersonId ? `<div class="pickup-form">
                         <div class="inline-form-row">
                             <input type="date" id="pickupDate-${rx.id}" class="form-input" title="Pickup date" />
                             <input type="text" id="pickupQty-${rx.id}" placeholder="Quantity" class="form-input" />
@@ -52,7 +52,7 @@
                             <input type="number" id="pickupCost-${rx.id}" placeholder="Cost" class="form-input" step="0.01" />
                             <button class="btn btn-primary btn-sm" onclick="medDocsAddPickup(${rx.id})">Log Pickup</button>
                         </div>
-                    </div>
+                    </div>` : ''}
                     <div class="pickup-list" id="pickupList-${rx.id}"></div>
                 </div>
             </div>`;

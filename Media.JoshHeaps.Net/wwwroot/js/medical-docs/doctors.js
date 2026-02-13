@@ -2,7 +2,8 @@
     const { state } = app;
 
     app.loadDoctors = async function () {
-        const res = await fetch(`${app.API}/doctors`);
+        const personParam = state.selectedPersonId ? `?personId=${state.selectedPersonId}` : '';
+        const res = await fetch(`${app.API}/doctors${personParam}`);
         if (!res.ok) return;
         state.doctors = await res.json();
         app.renderDoctors();
@@ -26,7 +27,7 @@
             return `<div class="doctor-card-wrapper" id="doctor-wrapper-${doc.id}">
                 <div class="doctor-card" id="doctor-${doc.id}">
                     <div class="doctor-info">
-                        <div class="doctor-name">${app.escapeHtml(doc.name)}</div>
+                        <div class="doctor-name">${app.personBadge(doc.personId)}${app.escapeHtml(doc.name)}</div>
                         <div class="doctor-details">${details.map(d => app.escapeHtml(d)).join(' &middot; ')}</div>
                         ${doc.notes ? `<div class="doctor-notes">${app.escapeHtml(doc.notes)}</div>` : ''}
                     </div>
@@ -68,6 +69,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                personId: state.selectedPersonId,
                 name,
                 specialty: document.getElementById('newDoctorSpecialty').value.trim() || null,
                 phone: document.getElementById('newDoctorPhone').value.trim() || null,

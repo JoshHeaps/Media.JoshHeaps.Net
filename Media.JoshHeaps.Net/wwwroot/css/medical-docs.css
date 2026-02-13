@@ -1528,6 +1528,26 @@
 }
 
 /* ======================== */
+/* All-mode (read-only)      */
+/* ======================== */
+
+.all-mode .add-form-toggle { display: none; }
+.all-mode .add-form-collapsible { display: none; }
+
+.person-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    background: var(--accent-primary);
+    color: #fff;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+/* ======================== */
 /* Responsive (<=768px)      */
 /* ======================== */
 

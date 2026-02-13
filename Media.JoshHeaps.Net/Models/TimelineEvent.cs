@@ -4,6 +4,7 @@ public class TimelineEvent
 {
     public string EventType { get; set; } = "";
     public long Id { get; set; }
+    public long PersonId { get; set; }
     public string? Label { get; set; }
     public string? Detail { get; set; }
     public string? SubType { get; set; }

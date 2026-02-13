@@ -11,7 +11,9 @@
       "Bash(tree:*)",
       "Bash(del Index.cshtml Index.cshtml.cs)",
       "Bash(dotnet build:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

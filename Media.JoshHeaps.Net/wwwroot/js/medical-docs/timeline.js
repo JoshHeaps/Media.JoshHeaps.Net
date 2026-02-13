@@ -21,12 +21,11 @@
     };
 
     app.loadTimeline = async function () {
-        if (!state.selectedPersonId) return;
-
         state.timelineOffset = 0;
         state.timelineEvents = [];
 
-        var res = await fetch(app.API + '/timeline?personId=' + state.selectedPersonId + '&offset=0&limit=' + TIMELINE_LIMIT);
+        var personParam = state.selectedPersonId ? 'personId=' + state.selectedPersonId + '&' : '';
+        var res = await fetch(app.API + '/timeline?' + personParam + 'offset=0&limit=' + TIMELINE_LIMIT);
         if (!res.ok) return;
 
         var events = await res.json();
@@ -39,9 +38,8 @@
     };
 
     app.loadMoreTimeline = async function () {
-        if (!state.selectedPersonId) return;
-
-        var res = await fetch(app.API + '/timeline?personId=' + state.selectedPersonId + '&offset=' + state.timelineOffset + '&limit=' + TIMELINE_LIMIT);
+        var morePersonParam = state.selectedPersonId ? 'personId=' + state.selectedPersonId + '&' : '';
+        var res = await fetch(app.API + '/timeline?' + morePersonParam + 'offset=' + state.timelineOffset + '&limit=' + TIMELINE_LIMIT);
         if (!res.ok) return;
 
         var events = await res.json();
@@ -90,7 +88,7 @@
                     + '<div class="timeline-icon">' + icon + '</div>'
                     + '<div class="timeline-content">'
                     + '<div class="timeline-date">' + dateStr + ' ' + typeBadge + ' ' + subBadge + '</div>'
-                    + '<div class="timeline-label">' + app.escapeHtml(ev.label || 'Untitled') + '</div>'
+                    + '<div class="timeline-label">' + app.personBadge(ev.personId) + app.escapeHtml(ev.label || 'Untitled') + '</div>'
                     + detail
                     + '</div>'
                     + '</div>';

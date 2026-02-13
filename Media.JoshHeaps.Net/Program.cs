@@ -19,6 +19,7 @@ builder.Services.AddScoped<FolderService>();
 builder.Services.AddScoped<GraphService>();
 builder.Services.AddScoped<MedicalDocsService>();
 builder.Services.AddSingleton<MedicalAiService>();
+builder.Services.AddScoped<ThemeService>();
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();

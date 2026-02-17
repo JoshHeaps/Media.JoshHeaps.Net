@@ -193,6 +193,8 @@
             return `<option value="${d.id}">${app.escapeHtml(label)}</option>`;
         }).join('');
 
+        const showForms = state.selectedPersonId ? '' : 'style="display:none"';
+
         const billsHtml = bills.map(b => {
             const meta = [];
             if (b.billDate) meta.push(app.formatDate(b.billDate));
@@ -249,7 +251,6 @@
             </div>`;
         }).join('');
 
-        const showForms = state.selectedPersonId ? '' : 'style="display:none"';
         section.innerHTML = `
             <div class="charges-section">
                 <div class="charges-header">Bills</div>

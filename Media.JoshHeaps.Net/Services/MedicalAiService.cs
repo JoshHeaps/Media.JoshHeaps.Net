@@ -263,7 +263,7 @@ public class MedicalAiService
 - ""doctorName"": string or null — the individual doctor/physician name mentioned (e.g. ""Dr. John Smith"" → ""John Smith""). If multiple, pick the primary/treating physician.
 - ""conditionNames"": array of medical condition names mentioned or clearly implied (e.g. ""Type 2 Diabetes"", ""Hypertension""). Only include conditions you can confidently identify. Use standard medical terminology. Return empty array if none are obvious.
 
-Return ONLY the JSON object, no other text.";
+Return ONLY the JSON object, no other text. If a document is a receipt for an individual prescription, label it as a prescription.";
 
         var userPrompt = $"Analyze this medical document text and classify it.\n\nDocument text:\n{truncatedText}";
 

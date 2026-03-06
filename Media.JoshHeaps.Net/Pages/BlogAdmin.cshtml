@@ -1,0 +1,82 @@
+@page
+@model Media.JoshHeaps.Net.Pages.BlogAdminModel
+@{
+    ViewData["Title"] = "Blog Admin";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/blog-admin.css" asp-append-version="true" />
+}
+
+<div class="dashboard-container">
+    <div class="welcome-section">
+        <div class="welcome-left">
+            <a href="/Admin" class="back-button" title="Back to Admin">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </a>
+            <h1>Blog Admin</h1>
+        </div>
+        <div class="quick-actions">
+            <button id="newPostBtn" class="btn btn-primary">New Post</button>
+        </div>
+    </div>
+
+    <div id="postsList" class="admin-section">
+        <div class="section-header">
+            <h2>Posts</h2>
+        </div>
+        <div class="table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Slug</th>
+                        <th>Tags</th>
+                        <th>Published</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="postsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="postEditor" class="admin-section" style="display: none;">
+        <div class="section-header">
+            <h2 id="editorTitle">New Post</h2>
+        </div>
+        <input type="hidden" id="editPostId" />
+        <div class="form-group">
+            <label for="postTitle">Title</label>
+            <input type="text" id="postTitle" class="form-input" placeholder="Post title" />
+        </div>
+        <div class="form-group">
+            <label for="postSummary">Summary</label>
+            <input type="text" id="postSummary" class="form-input" placeholder="Brief summary" />
+        </div>
+        <div class="form-group">
+            <label for="postTags">Tags (comma-separated)</label>
+            <input type="text" id="postTags" class="form-input" placeholder="dev, personal" />
+        </div>
+        <div class="form-group">
+            <label for="postDate">Published Date</label>
+            <input type="date" id="postDate" class="form-input" />
+        </div>
+        <div class="form-group">
+            <label for="postContent">Markdown Content</label>
+            <textarea id="postContent" class="form-input form-textarea" placeholder="Write your post in markdown..."></textarea>
+        </div>
+        <div class="editor-actions">
+            <button id="savePostBtn" class="btn btn-primary">Save</button>
+            <button id="cancelEditBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/blog-admin.js" asp-append-version="true"></script>
+}

@@ -9,6 +9,51 @@
         document.getElementById('newPostBtn').addEventListener('click', showNewPostEditor);
         document.getElementById('savePostBtn').addEventListener('click', savePost);
         document.getElementById('cancelEditBtn').addEventListener('click', hideEditor);
+
+        const imageInput = document.getElementById('imageFileInput');
+        document.getElementById('uploadImageBtn').addEventListener('click', () => imageInput.click());
+        imageInput.addEventListener('change', uploadImage);
+    }
+
+    async function uploadImage() {
+        const input = document.getElementById('imageFileInput');
+        const status = document.getElementById('uploadStatus');
+        if (!input.files.length) return;
+
+        const file = input.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+
+        status.textContent = 'Uploading...';
+        status.className = 'upload-status';
+
+        try {
+            const res = await fetch('/api/blog/images', { method: 'POST', body: formData });
+            if (!res.ok) {
+                const err = await res.json();
+                status.textContent = err.error || 'Upload failed';
+                status.className = 'upload-status upload-error';
+                return;
+            }
+            const { url } = await res.json();
+            const textarea = document.getElementById('postContent');
+            const markdown = `![${file.name}](${url})`;
+            const pos = textarea.selectionStart;
+            const before = textarea.value.substring(0, pos);
+            const after = textarea.value.substring(pos);
+            const needsNewline = before.length > 0 && !before.endsWith('\n') ? '\n' : '';
+            textarea.value = before + needsNewline + markdown + '\n' + after;
+            textarea.focus();
+            textarea.selectionStart = textarea.selectionEnd = pos + needsNewline.length + markdown.length + 1;
+            status.textContent = 'Uploaded!';
+            status.className = 'upload-status upload-success';
+            setTimeout(() => { status.textContent = ''; }, 2000);
+        } catch {
+            status.textContent = 'Upload failed';
+            status.className = 'upload-status upload-error';
+        } finally {
+            input.value = '';
+        }
     }
 
     async function loadPosts() {

@@ -229,6 +229,26 @@
     border-color: var(--accent-primary);
 }
 
+.content-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.upload-status {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.upload-error {
+    color: var(--danger);
+}
+
+.upload-success {
+    color: var(--success, #22c55e);
+}
+
 .form-textarea {
     min-height: 400px;
     resize: vertical;

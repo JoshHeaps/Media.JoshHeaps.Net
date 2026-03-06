@@ -68,6 +68,11 @@
         </div>
         <div class="form-group">
             <label for="postContent">Markdown Content</label>
+            <div class="content-toolbar">
+                <button type="button" id="uploadImageBtn" class="btn btn-secondary btn-sm">Upload Image</button>
+                <input type="file" id="imageFileInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;" />
+                <span id="uploadStatus" class="upload-status"></span>
+            </div>
             <textarea id="postContent" class="form-input form-textarea" placeholder="Write your post in markdown..."></textarea>
         </div>
         <div class="editor-actions">

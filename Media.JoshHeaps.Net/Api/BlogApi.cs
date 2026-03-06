@@ -107,6 +107,33 @@ public class BlogApi(BlogService blogService, DbExecutor dbExecutor) : Controlle
         return Ok(new { success = true });
     }
 
+    [HttpPost("images")]
+    public async Task<IActionResult> UploadImage(IFormFile file)
+    {
+        var userId = GetUserIdFromAuth();
+        if (userId is null) return Unauthorized();
+        if (!await IsAdmin(userId.Value)) return Forbid();
+
+        if (file is null || file.Length == 0)
+            return BadRequest(new { error = "No file provided" });
+
+        var (url, error) = await blogService.SaveImageAsync(file);
+        if (url is null)
+            return BadRequest(new { error });
+
+        return Ok(new { url });
+    }
+
+    [HttpGet("images/{fileName}")]
+    public IActionResult GetImage(string fileName)
+    {
+        var (filePath, mimeType) = blogService.GetImagePath(fileName);
+        if (filePath is null)
+            return NotFound();
+
+        return PhysicalFile(filePath, mimeType!);
+    }
+
     private static object MapToPublicDto(Models.BlogPost post) => new
     {
         post.Id,

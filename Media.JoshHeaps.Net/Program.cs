@@ -20,6 +20,7 @@ builder.Services.AddScoped<GraphService>();
 builder.Services.AddScoped<MedicalDocsService>();
 builder.Services.AddSingleton<MedicalAiService>();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<BlogService>();
 
 // Add session support
 builder.Services.AddDistributedMemoryCache();

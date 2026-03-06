@@ -4,8 +4,10 @@ using Media.JoshHeaps.Net.Models;
 
 namespace Media.JoshHeaps.Net.Services;
 
-public partial class BlogService(DbExecutor db, ILogger<BlogService> logger)
+public partial class BlogService(DbExecutor db, IWebHostEnvironment environment, ILogger<BlogService> logger)
 {
+    private static readonly HashSet<string> AllowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    private const long MaxImageSize = 10 * 1024 * 1024;
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
@@ -164,6 +166,58 @@ public partial class BlogService(DbExecutor db, ILogger<BlogService> logger)
             logger.LogError(ex, "Failed to delete blog post {Id}", id);
             return false;
         }
+    }
+
+    public async Task<(string? url, string? error)> SaveImageAsync(IFormFile file)
+    {
+        if (!AllowedMimeTypes.Contains(file.ContentType))
+            return (null, "Only JPEG, PNG, GIF, and WEBP images are allowed");
+
+        if (file.Length > MaxImageSize)
+            return (null, "Image must be under 10MB");
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (string.IsNullOrEmpty(ext)) ext = ".jpg";
+
+        var fileName = $"{Guid.NewGuid()}{ext}";
+        var folder = Path.Combine(environment.ContentRootPath, "App_Data", "blog");
+        Directory.CreateDirectory(folder);
+
+        var filePath = Path.Combine(folder, fileName);
+        try
+        {
+            await using var stream = new FileStream(filePath, FileMode.Create);
+            await file.CopyToAsync(stream);
+            return ($"/api/blog/images/{fileName}", null);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to save blog image");
+            if (File.Exists(filePath)) File.Delete(filePath);
+            return (null, "Failed to save image");
+        }
+    }
+
+    public (string? filePath, string? mimeType) GetImagePath(string fileName)
+    {
+        if (fileName.Contains("..") || fileName.Contains('/') || fileName.Contains('\\'))
+            return (null, null);
+
+        var filePath = Path.Combine(environment.ContentRootPath, "App_Data", "blog", fileName);
+        if (!File.Exists(filePath))
+            return (null, null);
+
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        var mimeType = ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+
+        return (filePath, mimeType);
     }
 
     private static BlogPost MapBlogPost(Npgsql.NpgsqlDataReader reader)

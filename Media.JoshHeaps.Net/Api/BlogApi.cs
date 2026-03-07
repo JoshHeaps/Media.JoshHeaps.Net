@@ -6,7 +6,7 @@ namespace Media.JoshHeaps.Net.Api;
 
 [ApiController]
 [Route("api/blog")]
-public class BlogApi(BlogService blogService, DbExecutor dbExecutor) : ControllerBase
+public class BlogApi(BlogService blogService, DbExecutor dbExecutor, IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<BlogApi> logger) : ControllerBase
 {
     [HttpGet("posts")]
     public async Task<IActionResult> GetPosts()
@@ -65,6 +65,7 @@ public class BlogApi(BlogService blogService, DbExecutor dbExecutor) : Controlle
         if (post is null)
             return StatusCode(500, new { error = "Failed to create post" });
 
+        _ = InvalidateFrontendCacheAsync();
         return Ok(MapToAdminDto(post));
     }
 
@@ -91,6 +92,7 @@ public class BlogApi(BlogService blogService, DbExecutor dbExecutor) : Controlle
         if (post is null)
             return NotFound(new { error = "Post not found" });
 
+        _ = InvalidateFrontendCacheAsync();
         return Ok(MapToAdminDto(post));
     }
 
@@ -104,6 +106,7 @@ public class BlogApi(BlogService blogService, DbExecutor dbExecutor) : Controlle
         var deleted = await blogService.DeletePostAsync(id);
         if (!deleted) return NotFound(new { error = "Post not found" });
 
+        _ = InvalidateFrontendCacheAsync();
         return Ok(new { success = true });
     }
 
@@ -157,6 +160,26 @@ public class BlogApi(BlogService blogService, DbExecutor dbExecutor) : Controlle
         post.CreatedAt,
         post.UpdatedAt
     };
+
+    private async Task InvalidateFrontendCacheAsync()
+    {
+        try
+        {
+            var url = configuration["BlogCache:InvalidateUrl"];
+            var key = configuration["BlogCache:InvalidateKey"];
+            if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(key)) return;
+
+            var client = httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+            var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Add("X-Invalidate-Key", key);
+            await client.SendAsync(request);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to invalidate frontend blog cache");
+        }
+    }
 
     private async Task<bool> IsAdmin(long userId)
     {

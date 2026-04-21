@@ -16,6 +16,9 @@ public class LoginModel(AuthService authService) : PageModel
     [BindProperty]
     public bool RememberMe { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
+
     public string? ErrorMessage { get; set; }
     public string? SuccessMessage { get; set; }
     public string? WarningMessage { get; set; }
@@ -26,7 +29,7 @@ public class LoginModel(AuthService authService) : PageModel
         var userId = HttpContext.Session.GetString("UserId");
         if (!string.IsNullOrEmpty(userId))
         {
-            Response.Redirect("/Landing");
+            Response.Redirect(SafeReturnUrl() ?? "/Landing");
             return;
         }
 
@@ -90,6 +93,9 @@ public class LoginModel(AuthService authService) : PageModel
             Response.Cookies.Append("RememberMe", userInfo.Id.ToString(), cookieOptions);
         }
 
-        return Redirect("/Landing");
+        return Redirect(SafeReturnUrl() ?? "/Landing");
     }
+
+    private string? SafeReturnUrl() =>
+        !string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : null;
 }

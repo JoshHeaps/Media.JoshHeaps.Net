@@ -56,7 +56,7 @@ public class SsoApi(DbExecutor db, IConfiguration config, ILogger<SsoApi> logger
             return BadRequest(new { error = "user no longer exists" });
         }
 
-        var jwt = IssueToken(user, request.ClientId);
+        var jwt = await IssueTokenAsync(user, request.ClientId);
         return Ok(new SsoTokenResponse
         {
             AccessToken = jwt,
@@ -118,7 +118,7 @@ public class SsoApi(DbExecutor db, IConfiguration config, ILogger<SsoApi> logger
             new { userId });
     }
 
-    private string IssueToken(SsoUser user, string audience)
+    private async Task<string> IssueTokenAsync(SsoUser user, string audience)
     {
         var jwtKey = config["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
         var jwtIssuer = config["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT Issuer not configured");
@@ -126,7 +126,9 @@ public class SsoApi(DbExecutor db, IConfiguration config, ILogger<SsoApi> logger
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var roles = await LoadUserRolesAsync(user.Id);
+
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -136,6 +138,8 @@ public class SsoApi(DbExecutor db, IConfiguration config, ILogger<SsoApi> logger
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
         };
 
+        claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+
         var token = new JwtSecurityToken(
             issuer: jwtIssuer,
             audience: audience,
@@ -144,6 +148,17 @@ public class SsoApi(DbExecutor db, IConfiguration config, ILogger<SsoApi> logger
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private async Task<List<string>> LoadUserRolesAsync(long userId)
+    {
+        return await db.ExecuteListReaderAsync(
+            @"SELECT r.name
+              FROM app.user_roles ur
+              JOIN app.roles r ON ur.role_id = r.id
+              WHERE ur.user_id = @userId",
+            reader => reader.GetString(0),
+            new { userId });
     }
 
     private static string HashCode(string code)

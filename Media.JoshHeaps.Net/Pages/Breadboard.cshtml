@@ -1,0 +1,176 @@
+@page
+@model Media.JoshHeaps.Net.Pages.BreadboardModel
+@{
+    ViewData["Title"] = "Breadboard Simulator";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/breadboard-projects.css" asp-append-version="true" />
+}
+
+@* Class names are this page's own (bbp- prefix, styled in breadboard-projects.css).
+   This app never links Bootstrap's stylesheet, so Bootstrap class names here would imply
+   styling that does not exist. Colours come from the site.css custom properties, so the
+   page follows the theme toggle without any theme-specific rules. *@
+<div class="bbp-page">
+    <div class="bbp-header">
+        <div class="bbp-header-left">
+            <a href="/Landing" class="bbp-back" title="Back to Home">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </a>
+            <h1>Breadboard Simulator</h1>
+        </div>
+        <a href="/Logout" class="bbp-btn bbp-btn-danger">Logout</a>
+    </div>
+
+    <div id="bb-error" class="bbp-error" role="alert"></div>
+
+    <div class="bbp-card">
+        <h2 class="bbp-card-title">New project</h2>
+        <form id="bb-create-form" class="bbp-create-form">
+            <div class="bbp-field">
+                <label for="bb-new-name">Name</label>
+                <input type="text" class="bbp-input" id="bb-new-name" maxlength="200" required />
+            </div>
+            <div class="bbp-field bbp-field-grow">
+                <label for="bb-new-description">Description</label>
+                <input type="text" class="bbp-input" id="bb-new-description" maxlength="2000" />
+            </div>
+            <button type="submit" class="bbp-btn bbp-btn-primary">Create</button>
+        </form>
+    </div>
+
+    @if (Model.Projects.Count == 0)
+    {
+        <p class="bbp-empty">No projects yet. Create one above to start wiring.</p>
+    }
+    else
+    {
+        <div class="bbp-list" id="bb-project-list">
+            @foreach (var project in Model.Projects)
+            {
+                <div class="bbp-item" data-project-id="@project.Id" data-project-name="@project.Name">
+                    <div class="bbp-item-main">
+                        <a class="bbp-item-name" href="/BreadboardEditor?projectId=@project.Id">@project.Name</a>
+                        @if (!string.IsNullOrWhiteSpace(project.Description))
+                        {
+                            <div class="bbp-item-description">@project.Description</div>
+                        }
+                        @* Rendered in the viewer's timezone by the module script below, not the server's. *@
+                        <div class="bbp-item-meta bbp-updated" data-updated-utc="@project.UpdatedAt.ToUniversalTime().ToString("O")"></div>
+                    </div>
+                    <div class="bbp-item-actions">
+                        @* An <a>, not a <button data-action>, so the delegated handler below ignores it. *@
+                        <a class="bbp-btn bbp-btn-primary" href="/BreadboardEditor?projectId=@project.Id">Open</a>
+                        <button type="button" class="bbp-btn" data-action="rename">Rename</button>
+                        <button type="button" class="bbp-btn bbp-btn-danger" data-action="delete">Delete</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script type="module">
+        const projectsUrl = '/api/breadboard/projects';
+        const errorBox = document.getElementById('bb-error');
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.classList.add('is-visible');
+        }
+
+        function clearError() {
+            errorBox.textContent = '';
+            errorBox.classList.remove('is-visible');
+        }
+
+        async function send(method, url, body) {
+            clearError();
+
+            let response;
+            try {
+                response = await fetch(url, {
+                    method,
+                    credentials: 'same-origin',
+                    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+                    body: body === undefined ? undefined : JSON.stringify(body)
+                });
+            } catch {
+                // A silent no-op would read as success, which is the worst outcome for a delete.
+                showError('Network error - could not reach the server. Nothing was changed.');
+                return false;
+            }
+
+            if (response.ok) {
+                return true;
+            }
+
+            let message = `Request failed (${response.status})`;
+            try {
+                const payload = await response.json();
+                if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+                    message = payload.errors.join(' ');
+                }
+            } catch {
+                // Non-JSON error body; the status-based message stands.
+            }
+
+            showError(message);
+            return false;
+        }
+
+        for (const cell of document.querySelectorAll('.bbp-updated')) {
+            const updated = new Date(cell.dataset.updatedUtc);
+            cell.textContent = `Updated ${updated.toLocaleString()}`;
+        }
+
+        document.getElementById('bb-create-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const name = document.getElementById('bb-new-name').value.trim();
+            const description = document.getElementById('bb-new-description').value.trim();
+            if (name.length === 0) {
+                showError('Name is required');
+                return;
+            }
+
+            if (await send('POST', projectsUrl, { name, description: description || null })) {
+                window.location.reload();
+            }
+        });
+
+        document.getElementById('bb-project-list')?.addEventListener('click', async (event) => {
+            const button = event.target.closest('button[data-action]');
+            if (button === null) {
+                return;
+            }
+
+            const row = button.closest('[data-project-id]');
+            const id = row.dataset.projectId;
+            const currentName = row.dataset.projectName;
+
+            if (button.dataset.action === 'rename') {
+                const name = window.prompt('New name', currentName);
+                if (name === null || name.trim().length === 0) {
+                    return;
+                }
+                if (await send('PUT', `${projectsUrl}/${id}`, { name: name.trim() })) {
+                    window.location.reload();
+                }
+                return;
+            }
+
+            if (window.confirm(`Delete "${currentName}"? This cannot be undone.`)) {
+                if (await send('DELETE', `${projectsUrl}/${id}`)) {
+                    window.location.reload();
+                }
+            }
+        });
+    </script>
+}

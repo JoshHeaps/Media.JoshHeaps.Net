@@ -1,0 +1,24 @@
+@page
+@model Media.JoshHeaps.Net.Pages.BreadboardEditorModel
+@{
+    ViewData["Title"] = $"Breadboard - {Model.ProjectName}";
+    Layout = "_Layout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/breadboard.css" asp-append-version="true" />
+}
+
+@* Shell only. Everything inside #breadboard-editor is built by the editor module, so the
+   component palette can grow without a Razor edit. Contract agreed with frontend-impl:
+   the root id and the three data-attributes below are the entire server-to-editor surface. *@
+<div class="bb-fullbleed">
+    <div id="breadboard-editor"
+         data-project-id="@Model.ProjectId"
+         data-project-name="@Model.ProjectName"
+         data-api-base="/api/breadboard"></div>
+</div>
+
+@section Scripts {
+    <script type="module" src="~/js/breadboard/editor/main.js"></script>
+}

@@ -1,0 +1,590 @@
+/* Breadboard simulator.
+ *
+ * Theming follows site.css: the DARK palette is the default on :root, and
+ * [data-theme="light"] overrides it. Do not add dark-only blocks.
+ *
+ * The --bb-* custom properties below are read by the canvas renderer through
+ * getComputedStyle - canvas cannot inherit CSS, so every colour the renderer draws is
+ * defined here and nowhere else. Changing the board's look is a stylesheet edit.
+ */
+
+:root {
+    /* Canvas surround */
+    --bb-canvas-bg: #14161a;
+    --bb-grid: #1e2126;
+
+    /* Board body - a dark-room breadboard reads slightly desaturated */
+    --bb-board-face: #d9d6cb;
+    --bb-board-edge: #a8a496;
+    --bb-board-bevel: #efece3;
+    --bb-channel: #c3bfb2;
+    --bb-channel-edge: #a29e90;
+    --bb-hole: #26282b;
+    --bb-hole-rim: #b3afa2;
+    --bb-silk: #7d7869;
+    --bb-silk-strong: #56524a;
+    --bb-rail-plus: #c8483f;
+    --bb-rail-minus: #3f63c8;
+
+    /* Interaction */
+    --bb-hover: #3fb950;
+    --bb-selection: #58a6ff;
+    --bb-ghost: #58a6ff;
+    --bb-invalid: #f85149;
+    --bb-wire-shadow: rgba(0, 0, 0, 0.45);
+
+    /* Parts */
+    --bb-chip-body: #24242a;
+    --bb-chip-label: #d9d9de;
+    --bb-chip-pin: #c2c2c8;
+    --bb-resistor-body: #d6c298;
+    --bb-resistor-lead: #a9a9ad;
+    --bb-button-body: #34343a;
+    --bb-button-cap: #c9553f;
+    --bb-button-cap-down: #8d3a2b;
+    --bb-dip-body: #2b4785;
+    --bb-dip-switch-on: #f4f4f6;
+    --bb-dip-switch-off: #83838a;
+    --bb-supply-body: #1f2933;
+    --bb-supply-text: #e6edf3;
+    --bb-burned: #4a4a4a;
+
+    /* Logic levels */
+    --bb-level-low: #3b6ea5;
+    --bb-level-high: #e0483d;
+    --bb-level-hiz: #7d7d85;
+    --bb-level-weak-low: #4f7fa8;
+    --bb-level-weak-high: #d98a4a;
+    --bb-level-contention: #ffcc00;
+}
+
+[data-theme="light"] {
+    --bb-canvas-bg: #eceff3;
+    --bb-grid: #dfe3e9;
+
+    --bb-board-face: #f2f0e9;
+    --bb-board-edge: #c9c5b8;
+    --bb-board-bevel: #ffffff;
+    --bb-channel: #ddd9cf;
+    --bb-channel-edge: #bdb9ac;
+    --bb-hole: #3a3a3a;
+    --bb-hole-rim: #cfcbbe;
+    --bb-silk: #97917f;
+    --bb-silk-strong: #625d52;
+    --bb-rail-plus: #d24b4b;
+    --bb-rail-minus: #4b6fd2;
+
+    --bb-wire-shadow: rgba(0, 0, 0, 0.22);
+    --bb-chip-body: #2b2b30;
+    --bb-supply-body: #26303a;
+}
+
+/* --- Page shell -------------------------------------------------------------
+ * The canvas needs a box with a definite height to measure itself against, which
+ * nothing above it provides - hence the explicit 100vh.
+ *
+ * No breakout is needed and none is wanted. _Layout.cshtml links only site.css: neither
+ * Bootstrap's CSS nor the CSS-isolation bundle (Media.JoshHeaps.Net.styles.css) is ever
+ * loaded, so `.container` applies no max-width or padding, and the empty <footer>
+ * reserves no space. Verified, not assumed. Consequently:
+ *   - `width: 100%` rather than `100vw`, because 100vw includes the vertical scrollbar
+ *     and would produce a horizontal one for no benefit,
+ *   - full `100vh` rather than subtracting a footer that does not occupy any height.
+ */
+.bb-fullbleed {
+    width: 100%;
+    height: 100vh;
+    min-height: 480px;
+    overflow: hidden;
+}
+
+#breadboard-editor {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--bb-canvas-bg);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.bb-editor-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.bb-workspace {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* --- Toolbar --------------------------------------------------------------- */
+
+.bb-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+    flex: 0 0 auto;
+}
+
+.bb-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.bb-group-view {
+    margin-left: auto;
+}
+
+.bb-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0.5rem 0 0;
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bb-save-state {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    min-width: 9ch;
+}
+
+.bb-save-dirty { color: var(--accent-primary); }
+.bb-save-error { color: var(--danger); }
+.bb-save-clean { color: var(--success); }
+
+.bb-sim-state {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    min-width: 12ch;
+}
+
+.bb-sim-running { color: var(--success); }
+.bb-sim-halted { color: var(--danger); }
+
+.bb-speed {
+    width: 8rem;
+    accent-color: var(--accent-primary);
+}
+
+.bb-speed-label,
+.bb-zoom-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    min-width: 8ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.bb-zoom-label { min-width: 5ch; text-align: center; }
+
+/* --- Buttons --------------------------------------------------------------- */
+
+.bb-btn {
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.bb-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+}
+
+.bb-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.bb-btn:focus-visible,
+.bb-tool:focus-visible,
+.bb-swatch:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+.bb-btn-primary {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+}
+
+.bb-btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: #fff;
+}
+
+.bb-btn-run { color: var(--success); }
+.bb-btn-danger { color: var(--danger); border-color: var(--border-primary); }
+.bb-btn-danger:hover:not(:disabled) { border-color: var(--danger); background: var(--bg-hover); }
+.bb-btn-ghost { background: transparent; border-color: transparent; }
+.bb-btn-small { font-size: 0.72rem; padding: 0.15rem 0.45rem; }
+
+.bb-btn-icon {
+    width: 1.9rem;
+    padding: 0.25rem 0;
+    text-align: center;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+/* --- Panel hosts ----------------------------------------------------------- */
+
+.bb-toolbar-host {
+    flex: 0 0 auto;
+}
+
+.bb-palette-host,
+.bb-props-host {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+}
+
+/* Scroll containers for the two panel bodies. min-height:0 is required: without it a
+   flex child refuses to shrink below its content and the panel grows instead of
+   scrolling. */
+.bb-props-body,
+.bb-boards-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* --- Palette --------------------------------------------------------------- */
+
+.bb-palette,
+.bb-props {
+    width: 13.5rem;
+    padding: 0.75rem;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.bb-palette { border-right: 1px solid var(--border-primary); }
+.bb-props { border-left: 1px solid var(--border-primary); width: 15rem; }
+
+.bb-palette-heading,
+.bb-props-heading {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    margin: 0 0 0.35rem;
+    font-weight: 600;
+}
+
+.bb-palette-section { display: flex; flex-direction: column; }
+
+.bb-palette-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+}
+
+.bb-tool {
+    font: inherit;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.3rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bb-tool:hover { background: var(--bg-hover); }
+
+.bb-tool.is-active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+}
+
+.bb-tool-component { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+
+.bb-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.bb-swatch {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    box-shadow: 0 0 0 1px var(--border-primary);
+    cursor: pointer;
+    padding: 0;
+}
+
+.bb-swatch.is-active {
+    border-color: var(--text-primary);
+    transform: scale(1.15);
+}
+
+.bb-palette-hint {
+    font-size: 0.7rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    margin: auto 0 0;
+}
+
+/* --- Canvas ---------------------------------------------------------------- */
+
+.bb-canvas-container {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 1px 1px, var(--bb-grid) 1px, transparent 0) 0 0 / 24px 24px,
+        var(--bb-canvas-bg);
+}
+
+.bb-layer {
+    position: absolute;
+    inset: 0;
+    display: block;
+}
+
+.bb-layer-overlay:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -2px;
+}
+
+/* --- Properties ------------------------------------------------------------ */
+
+.bb-props-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.bb-props-uid {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+}
+
+.bb-props-description,
+.bb-props-meta,
+.bb-props-empty {
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    margin: 0.35rem 0;
+}
+
+.bb-props-warning {
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--danger);
+    margin: 0.35rem 0;
+}
+
+.bb-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0.6rem 0;
+}
+
+.bb-field-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.bb-field-stack { display: flex; flex-direction: column; gap: 0.35rem; }
+
+.bb-input {
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.45rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    width: 100%;
+}
+
+.bb-input:focus-visible {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.bb-presets { display: flex; flex-wrap: wrap; gap: 0.2rem; }
+
+.bb-chip-btn {
+    font: inherit;
+    font-size: 0.66rem;
+    padding: 0.12rem 0.35rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.bb-chip-btn:hover { color: var(--text-primary); border-color: var(--accent-primary); }
+
+.bb-switch-row { display: flex; flex-wrap: wrap; gap: 0.2rem; }
+
+.bb-switch-toggle {
+    font: inherit;
+    font-size: 0.68rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 5px;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.bb-switch-toggle.is-on {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+}
+
+.bb-props-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+}
+
+.bb-board-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--border-secondary);
+    font-size: 0.74rem;
+}
+
+.bb-board-name { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+.bb-board-count { color: var(--text-secondary); margin-right: auto; }
+
+/* --- Status strip ---------------------------------------------------------- */
+
+.bb-status-host { flex: 0 0 auto; }
+
+.bb-status {
+    display: flex;
+    flex-direction: column;
+    max-height: 11rem;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-primary);
+}
+
+.bb-status-messages:empty,
+.bb-status-warnings:not(.is-visible) { display: none; }
+
+.bb-message {
+    padding: 0.35rem 0.875rem;
+    font-size: 0.76rem;
+    border-left: 3px solid transparent;
+    animation: bb-fade-in 0.15s ease;
+}
+
+.bb-message-info { color: var(--text-secondary); border-left-color: var(--border-primary); }
+.bb-message-warn { color: var(--text-primary); border-left-color: #e8a33d; }
+.bb-message-error { color: var(--danger); border-left-color: var(--danger); }
+
+@keyframes bb-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bb-message { animation: none; }
+    .bb-swatch.is-active { transform: none; }
+    .bb-btn { transition: none; }
+}
+
+.bb-status-warnings-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.875rem;
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.bb-status-warnings-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-right: auto;
+}
+
+.bb-warning {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.3rem 0.875rem;
+    font-size: 0.76rem;
+    border-left: 3px solid transparent;
+}
+
+.bb-warning-warn { border-left-color: #e8a33d; }
+.bb-warning-error { border-left-color: var(--danger); }
+.bb-warning-title { font-weight: 600; }
+.bb-warning-count { color: var(--text-secondary); font-size: 0.7rem; }
+
+.bb-warning-detail,
+.bb-warning-uids {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bb-warning-uids { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+
+/* --- Narrow screens -------------------------------------------------------- */
+
+@media (max-width: 900px) {
+    .bb-palette, .bb-props { width: 10.5rem; padding: 0.5rem; }
+    .bb-palette-grid { grid-template-columns: 1fr; }
+    .bb-group-speed { display: none; }
+}
+
+@media (max-width: 640px) {
+    .bb-props-host { display: none; }
+    .bb-toolbar { gap: 0.6rem; }
+    .bb-title { max-width: 12ch; }
+}

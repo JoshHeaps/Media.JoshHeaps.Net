@@ -21,6 +21,8 @@ builder.Services.AddScoped<MedicalDocsService>();
 builder.Services.AddSingleton<MedicalAiService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<BlogService>();
+builder.Services.AddScoped<BreadboardValidator>();
+builder.Services.AddScoped<BreadboardService>();
 builder.Services.AddHttpClient();
 
 // Add session support

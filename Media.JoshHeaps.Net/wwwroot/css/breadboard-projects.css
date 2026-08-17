@@ -1,0 +1,250 @@
+/* Breadboard Simulator - Project List Page Styles */
+
+/* Every colour here comes from the site.css custom properties, so light mode is handled
+   by the [data-theme="light"] block there and this file needs no theme-specific rules.
+   site.css already applies `* { margin: 0; padding: 0; box-sizing: border-box }`. */
+
+.bbp-page {
+    padding: 32px 0;
+}
+
+/* Header */
+
+.bbp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.bbp-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.bbp-header h1 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.bbp-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.bbp-back:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.bbp-back svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Buttons */
+
+.bbp-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    font-family: inherit;
+    line-height: 1.4;
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bbp-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+}
+
+.bbp-btn-primary {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: var(--bg-primary);
+}
+
+.bbp-btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.bbp-btn-danger {
+    color: var(--danger);
+}
+
+.bbp-btn-danger:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--bg-primary);
+}
+
+/* Error banner. Hidden by default; the script adds .is-visible to show it. Both halves are
+   defined right here, so visibility can never depend on a class defined somewhere else (or,
+   as it turned out, nowhere at all). Keep `display: none` below as the hidden baseline; if you
+   need a different VISIBLE display mode, change it on .bbp-error.is-visible instead. */
+
+.bbp-error {
+    display: none;
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    border: 1px solid var(--danger);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    color: var(--danger);
+    white-space: pre-line;
+}
+
+.bbp-error.is-visible {
+    display: block;
+}
+
+/* Create form */
+
+.bbp-card {
+    padding: 20px;
+    margin-bottom: 32px;
+    border: 1px solid var(--border-primary);
+    border-radius: 12px;
+    background: var(--bg-secondary);
+}
+
+.bbp-card-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.bbp-create-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.bbp-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 200px;
+}
+
+.bbp-field-grow {
+    flex: 1 1 320px;
+}
+
+.bbp-field label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.bbp-input {
+    padding: 8px 12px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease;
+}
+
+.bbp-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+/* Project list */
+
+.bbp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bbp-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    transition: all 0.2s ease;
+}
+
+.bbp-item:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-hover);
+}
+
+.bbp-item-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.bbp-item-name {
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.bbp-item-name:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+.bbp-item-description,
+.bbp-item-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.bbp-item-actions {
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.bbp-empty {
+    padding: 32px;
+    text-align: center;
+    border: 1px dashed var(--border-primary);
+    border-radius: 12px;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+    .bbp-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .bbp-item-actions {
+        justify-content: flex-end;
+    }
+}

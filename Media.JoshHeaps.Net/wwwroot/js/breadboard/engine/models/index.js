@@ -11,5 +11,7 @@ import './supply.js';
 import './resistor.js';
 import './switches.js';
 import './led.js';
+import './diode.js';
+import './transistor.js';
 
 export { registry, getModel, knownTypes, defineModel, WAKE_INIT, WAKE_PIN, WAKE_TIMER } from './registry.js';

@@ -39,6 +39,9 @@
     --bb-chip-pin: #c2c2c8;
     --bb-resistor-body: #d6c298;
     --bb-resistor-lead: #a9a9ad;
+    --bb-diode-body: #9aa7b4;
+    --bb-diode-band: #1c1c20;
+    --bb-transistor-body: #1f1f24;
     --bb-button-body: #34343a;
     --bb-button-cap: #c9553f;
     --bb-button-cap-down: #8d3a2b;
@@ -76,6 +79,7 @@
 
     --bb-wire-shadow: rgba(0, 0, 0, 0.22);
     --bb-chip-body: #2b2b30;
+    --bb-transistor-body: #2b2b30;
     --bb-supply-body: #26303a;
 }
 

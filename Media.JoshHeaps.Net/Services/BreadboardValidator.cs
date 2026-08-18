@@ -70,6 +70,7 @@ public class BreadboardValidator(ILogger<BreadboardValidator> logger)
     private const int ChipColumnSpan = 7;        // 14-pin DIP
     private const int DipSwitchColumnSpan = 8;   // 16-pin DIP
     private const int PushButtonColumnSpan = 3;
+    private const int TransistorColumnSpan = 3;   // TO-92, three legs one column apart
     private const int DipSwitchPositions = 8;
 
     private static readonly Regex UidPattern = new($@"^[A-Za-z0-9_.:-]{{1,{MaxUidLength}}}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -110,7 +111,8 @@ public class BreadboardValidator(ILogger<BreadboardValidator> logger)
 
     private static readonly HashSet<string> ComponentTypes = new(StringComparer.Ordinal)
     {
-        "led", "resistor", "pushButton", "dipSwitch8", "powerSupply5V",
+        "led", "resistor", "diode", "npn", "pnp", "nmos", "pmos",
+        "pushButton", "dipSwitch8", "powerSupply5V",
         "74HC00", "74HC02", "74HC04", "74HC08", "74HC32", "74HC86", "74HC30"
     };
 
@@ -289,7 +291,21 @@ public class BreadboardValidator(ILogger<BreadboardValidator> logger)
         switch (type)
         {
             case "led":
-                ValidateLed(component, path, boardUids, errors);
+                ValidateTwoHoleSpan(component, path, boardUids, errors);
+                ValidateLedProps(component, path, errors);
+                break;
+
+            case "diode":
+                ValidateTwoHoleSpan(component, path, boardUids, errors);
+                ValidateEmptyProps(component, path, errors);
+                break;
+
+            case "npn":
+            case "pnp":
+            case "nmos":
+            case "pmos":
+                ValidateInlinePackage(component, path, TransistorColumnSpan, boardUids, errors);
+                ValidateEmptyProps(component, path, errors);
                 break;
 
             case "resistor":
@@ -334,15 +350,15 @@ public class BreadboardValidator(ILogger<BreadboardValidator> logger)
     }
 
     /// <summary>
-    /// An LED spans two holes: the anchor is the anode and the cathode sits one hole away in
-    /// the orient direction. A leg in a power rail is legal — electrically useless if both
-    /// legs share a rail, but a real breadboard allows it — so only the footprint is checked.
+    /// A two-legged part spanning two holes: the anchor is the first terminal (an LED's anode,
+    /// a diode's anode) and the second sits one hole away in the orient direction. A leg in a
+    /// power rail is legal — electrically useless if both legs share a rail, but a real
+    /// breadboard allows it — so only the footprint is checked.
     /// </summary>
-    private static void ValidateLed(JsonElement component, string path, HashSet<string> boardUids, ErrorList errors)
+    private static void ValidateTwoHoleSpan(JsonElement component, string path, HashSet<string> boardUids, ErrorList errors)
     {
         var orient = ReadEnum(component, "orient", path, Orientations, errors, required: true);
         var anchor = ReadAnchor(component, path, boardUids, errors, required: true);
-        ValidateLedProps(component, path, errors);
 
         if (anchor is null || orient is null)
         {
@@ -352,7 +368,7 @@ public class BreadboardValidator(ILogger<BreadboardValidator> logger)
         if (orient is "up" or "down")
         {
             // Vertical travel moves one row and may legitimately cross the centre channel. A
-            // rail has no rows, so the cathode of an up/down LED anchored there has nowhere to go.
+            // rail has no rows, so the far leg of an up/down part anchored there has nowhere to go.
             if (anchor.Kind != "main")
             {
                 errors.Add($"{path}.orient", "not_valid_on_rail");
@@ -362,8 +378,8 @@ public class BreadboardValidator(ILogger<BreadboardValidator> logger)
             // Rows a..j read top to bottom, so "up" decreases the row index — the same sign
             // convention that maps "left"/"right" to -1/+1 on the column axis. Mirrors
             // shared/board-geometry.js (team amendment A12 pins it as contract).
-            var cathodeRow = (anchor.Row[0] - 'a') + (orient == "up" ? -1 : 1);
-            if (cathodeRow < 0 || cathodeRow >= MainRows.Count)
+            var farRow = (anchor.Row[0] - 'a') + (orient == "up" ? -1 : 1);
+            if (farRow < 0 || farRow >= MainRows.Count)
             {
                 errors.Add($"{path}.anchor", "footprint_off_board");
             }
@@ -371,13 +387,47 @@ public class BreadboardValidator(ILogger<BreadboardValidator> logger)
             return;
         }
 
-        var cathode = anchor.Position + (orient == "left" ? -1 : 1);
+        var farPosition = anchor.Position + (orient == "left" ? -1 : 1);
         var min = anchor.Kind == "main" ? MainColumnMin : RailIndexMin;
         var max = anchor.Kind == "main" ? MainColumnMax : RailIndexMax;
 
-        if (cathode < min || cathode > max)
+        if (farPosition < min || farPosition > max)
         {
             errors.Add($"{path}.anchor", "footprint_off_board");
+        }
+    }
+
+    /// <summary>
+    /// A three-legged inline package (TO-92). Its legs run along one row of the main grid, one
+    /// column apart, so only "left" and "right" leave each leg in a strip of its own — a
+    /// vertical placement would put two legs in the same five-hole strip, and a power rail is
+    /// one continuous strip, which is why an anchor there is rejected outright.
+    /// </summary>
+    private static void ValidateInlinePackage(
+        JsonElement component,
+        string path,
+        int columnSpan,
+        HashSet<string> boardUids,
+        ErrorList errors)
+    {
+        var orient = ReadEnum(component, "orient", path, PackageOrientations, errors, required: true);
+        var anchor = ReadAnchor(component, path, boardUids, errors, required: true);
+
+        if (anchor is null || orient is null)
+        {
+            return;
+        }
+
+        if (anchor.Kind != "main")
+        {
+            errors.Add($"{path}.anchor.kind", "must_be_main");
+            return;
+        }
+
+        var lastColumn = anchor.Position + ((orient == "left" ? -1 : 1) * (columnSpan - 1));
+        if (lastColumn < MainColumnMin || lastColumn > MainColumnMax)
+        {
+            errors.Add($"{path}.anchor.col", "package_off_board");
         }
     }
 

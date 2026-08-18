@@ -27,6 +27,8 @@ const WARNING_LABELS = Object.freeze(Object.assign(Object.create(null), {
     unknownComponent: 'Unrecognised component',
     unconnectedSupply: 'Supply is not connected to anything',
     selfShorted: 'Both ends are on the same net',
+    floatingControl: 'Nothing is connected to the base or gate',
+    unlimitedBaseCurrent: 'Transistor base has no series resistor',
     engineError: 'The simulation engine hit an internal error',
     warningsSuppressed: 'Some warnings were coalesced'
 }));
@@ -39,7 +41,8 @@ const SEVERITY = Object.freeze(Object.assign(Object.create(null), {
     shortCircuit: 'error',
     contention: 'error',
     oscillation: 'warn',
-    ledOvercurrent: 'warn'
+    ledOvercurrent: 'warn',
+    unlimitedBaseCurrent: 'warn'
 }));
 
 function humanizeKind(kind) {

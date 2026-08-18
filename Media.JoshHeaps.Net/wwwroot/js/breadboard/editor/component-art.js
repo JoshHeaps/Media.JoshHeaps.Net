@@ -167,6 +167,95 @@ function drawResistor(ctx, component, pins, colors, state, zoom) {
     ctx.restore();
 }
 
+function drawDiode(ctx, component, pins, colors) {
+    const [anode, cathode] = pins;
+    if (!anode || !cathode) return;
+
+    drawLead(ctx, anode, cathode, colors);
+
+    const angle = Math.atan2(cathode.y - anode.y, cathode.x - anode.x);
+    const length = Math.hypot(cathode.x - anode.x, cathode.y - anode.y);
+    const bodyLength = Math.max(PITCH * 0.5, Math.min(length * 0.6, PITCH * 1.8));
+    const bodyHeight = PITCH * 0.34;
+
+    ctx.save();
+    ctx.translate((anode.x + cathode.x) / 2, (anode.y + cathode.y) / 2);
+    ctx.rotate(angle);
+
+    ctx.fillStyle = colors.diodeBody;
+    roundRect(ctx, -bodyLength / 2, -bodyHeight / 2, bodyLength, bodyHeight, bodyHeight * 0.3);
+    ctx.fill();
+
+    // The band marks the cathode, which after the rotation is always the +x end.
+    ctx.fillStyle = colors.diodeBand;
+    ctx.fillRect(bodyLength * 0.24, -bodyHeight / 2, bodyLength * 0.16, bodyHeight);
+
+    ctx.restore();
+}
+
+/**
+ * TO-92 package seen from above: a flat face with a domed back, sitting over its own
+ * three holes. Everything is drawn within half a pitch of the pin row so the body stays
+ * inside componentBounds, which is what hit-testing and dirty-rect culling use.
+ */
+function drawTransistor(ctx, component, pins, colors, zoom) {
+    const placed = pins.filter(p => p !== null);
+    if (placed.length < 3) return;
+
+    const xs = placed.map(p => p.x);
+    const ys = placed.map(p => p.y);
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+    const w = Math.max(...xs) - x;
+    const cy = y + (Math.max(...ys) - y) / 2;
+    const pad = PITCH * 0.34;
+    const left = x - pad;
+    const right = x + w + pad;
+    const flatY = cy + PITCH * 0.42;
+    const backY = cy - PITCH * 0.52;
+
+    ctx.strokeStyle = colors.chipPin;
+    ctx.lineWidth = PITCH * 0.12;
+    ctx.lineCap = 'butt';
+    for (const pin of placed) {
+        ctx.beginPath();
+        ctx.moveTo(pin.x, flatY - PITCH * 0.1);
+        ctx.lineTo(pin.x, flatY + PITCH * 0.16);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = colors.transistorBody;
+    ctx.beginPath();
+    ctx.moveTo(left, flatY);
+    ctx.lineTo(right, flatY);
+    ctx.lineTo(right, backY + PITCH * 0.22);
+    ctx.quadraticCurveTo((left + right) / 2, backY - PITCH * 0.28, left, backY + PITCH * 0.22);
+    ctx.closePath();
+    ctx.fill();
+
+    const def = getComponentDef(component.type);
+    ctx.fillStyle = colors.chipLabel;
+    ctx.textAlign = 'center';
+
+    if (zoom > 1.4) {
+        // Leg letters, taken from the registry's pin names so they can never disagree
+        // with the netlist. They follow the pins, so a rotated part reads correctly.
+        ctx.font = `${PITCH * 0.26}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+        ctx.textBaseline = 'bottom';
+        ctx.globalAlpha = 0.7;
+        for (let i = 0; i < 3; i++) {
+            if (pins[i]) ctx.fillText(def.pins[i].name[0].toUpperCase(), pins[i].x, flatY - PITCH * 0.08);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    if (zoom > 0.9) {
+        ctx.font = `${PITCH * 0.3}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(def.label, (left + right) / 2, backY + PITCH * 0.3);
+    }
+}
+
 function drawPushButton(ctx, component, pins, colors, state) {
     const placed = pins.filter(p => p !== null);
     if (placed.length < 4) return;
@@ -387,6 +476,10 @@ export function drawComponent(ctx, component, boards, colors, state, zoom) {
     switch (component.type) {
         case 'led': drawLed(ctx, component, pins, colors, state); break;
         case 'resistor': drawResistor(ctx, component, pins, colors, state, zoom); break;
+        case 'diode': drawDiode(ctx, component, pins, colors); break;
+        case 'npn': case 'pnp': case 'nmos': case 'pmos':
+            drawTransistor(ctx, component, pins, colors, zoom);
+            break;
         case 'pushButton': drawPushButton(ctx, component, pins, colors, state); break;
         case 'dipSwitch8': drawDipSwitch(ctx, component, pins, colors, state, zoom); break;
         case 'powerSupply5V': drawPowerSupply(ctx, component, pins, colors, state, zoom, boards); break;

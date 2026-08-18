@@ -7,9 +7,10 @@ import { el, button, createListenerBag } from './dom.js';
 import { COMPONENT_TYPES, getComponentDef } from '../shared/component-registry.js';
 import { WIRE_COLORS, DEFAULT_WIRE_COLOR } from '../shared/circuit-schema.js';
 
-const CATEGORY_ORDER = Object.freeze(['passive', 'output', 'input', 'power', 'chip']);
+const CATEGORY_ORDER = Object.freeze(['passive', 'semiconductor', 'output', 'input', 'power', 'chip']);
 const CATEGORY_LABELS = Object.freeze(Object.assign(Object.create(null), {
     passive: 'Passive',
+    semiconductor: 'Semiconductor',
     output: 'Output',
     input: 'Input',
     power: 'Power',

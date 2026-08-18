@@ -116,6 +116,52 @@ function chipDef(type) {
     };
 }
 
+/**
+ * Orientations a three-legged inline package may carry. Its legs run along a row, so
+ * only the two horizontal directions leave each leg in a strip of its own: a column's
+ * rows a-e are one strip, which would short two legs of any vertical placement.
+ */
+export const INLINE_ORIENTATIONS = Object.freeze(['left', 'right']);
+
+/** Footprint for a part whose pins step away from the anchor in the orient direction. */
+function orientStepFootprint(pinCount) {
+    const pins = [];
+    for (let pin = 1; pin <= pinCount; pin++) {
+        pins.push(pin === 1
+            ? Object.freeze({ pin, at: 'anchor' })
+            : Object.freeze({ pin, at: 'orientStep', steps: pin - 1 }));
+    }
+    return Object.freeze({ kind: 'orientStep', pinCount, pins: Object.freeze(pins) });
+}
+
+/**
+ * The four transistors differ only in polarity and in what their legs are called; the
+ * package, the footprint and the placement rules are one part. Pin order is the
+ * physical TO-92 one, control terminal in the middle.
+ */
+function transistorDef(type, label, description, pinNames) {
+    return {
+        type,
+        label,
+        description,
+        category: 'semiconductor',
+        pins: namedPins(pinNames),
+        bodyColumns: 3,
+        straddlesGap: false,
+        anchorRows: null,
+        // A power rail is one continuous strip, so all three legs there would be common.
+        anchorKinds: Object.freeze(['main']),
+        anchorless: false,
+        orientable: true,
+        orientValues: INLINE_ORIENTATIONS,
+        defaultOrient: 'right',
+        dipStyle: false,
+        footprint: orientStepFootprint(3),
+        defaultProps: Object.freeze({}),
+        propSpecs: Object.freeze({})
+    };
+}
+
 const DEFS = Object.create(null);
 
 function define(def) {
@@ -185,6 +231,45 @@ define({
         })
     })
 });
+
+define({
+    type: 'diode',
+    label: 'Diode',
+    description: 'Signal diode (1N4148). Anchor is the anode; the banded cathode sits one hole away. Passes current one way only.',
+    category: 'semiconductor',
+    pins: namedPins(['anode', 'cathode']),
+    bodyColumns: 1,
+    straddlesGap: false,
+    anchorRows: null,
+    anchorKinds: Object.freeze(['main', 'rail']),
+    anchorless: false,
+    orientable: true,
+    orientValues: Object.freeze(['up', 'down', 'left', 'right']),
+    // Same reasoning as the LED: 'right' is the only default that reaches a different
+    // strip from every main column and also works from a rail hole.
+    defaultOrient: 'right',
+    dipStyle: false,
+    footprint: orientStepFootprint(2),
+    defaultProps: Object.freeze({}),
+    propSpecs: Object.freeze({})
+});
+
+const TRANSISTOR_DEFS = Object.freeze([
+    transistorDef('npn', 'NPN',
+        'NPN transistor (2N3904): emitter, base, collector. Conducts when the base is high and the emitter is the low side, so it switches a load to ground.',
+        ['emitter', 'base', 'collector']),
+    transistorDef('pnp', 'PNP',
+        'PNP transistor (2N3906): emitter, base, collector. Conducts when the base is low and the emitter is the high side, so it switches a load to the supply.',
+        ['emitter', 'base', 'collector']),
+    transistorDef('nmos', 'N-MOSFET',
+        'N-channel MOSFET (2N7000): source, gate, drain. Conducts when the gate is high and the source is the low side. The gate draws no current, so it needs a pull-down to stay off.',
+        ['source', 'gate', 'drain']),
+    transistorDef('pmos', 'P-MOSFET',
+        'P-channel MOSFET (BS250): source, gate, drain. Conducts when the gate is low and the source is the high side. The gate draws no current, so it needs a pull-up to stay off.',
+        ['source', 'gate', 'drain'])
+]);
+
+for (const def of TRANSISTOR_DEFS) define(def);
 
 define({
     type: 'pushButton',
@@ -277,7 +362,8 @@ Object.freeze(DEFS);
 
 /** All registered component type names, in palette order. */
 export const COMPONENT_TYPES = Object.freeze([
-    'led', 'resistor', 'pushButton', 'dipSwitch8', 'powerSupply5V', ...CHIP_TYPES
+    'led', 'resistor', 'diode', ...TRANSISTOR_DEFS.map(d => d.type),
+    'pushButton', 'dipSwitch8', 'powerSupply5V', ...CHIP_TYPES
 ]);
 
 /** Valid `orient` values for orientable components. */

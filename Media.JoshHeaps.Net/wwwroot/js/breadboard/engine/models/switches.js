@@ -1,50 +1,22 @@
 /**
  * Mechanical contacts: push button and 8-position DIP switch.
  *
- * A closed contact is modelled as a bidirectional conductor rather than a
- * dynamic merge of the two nets. Re-running union-find every time a user
- * presses a button would be both slow and a nightmare for the UI's net index,
- * which is handed out once at load and must stay valid.
- *
- * Conduction preserves STRENGTH, unlike a resistor: a closed button between the
- * two power rails has to hand SUPPLY strength across so the short reads as a
- * short circuit and not as garden-variety contention.
+ * Both are pure conduction elements — see conduction.js for why a closed
+ * contact drives across rather than merging the two nets, and why it preserves
+ * drive strength while doing so.
  *
  * The 1 ns contact delay is a loop breaker, not a debounce model. Two contacts
  * wired in a ring would otherwise conduct round it at zero delay forever.
  */
 
-import { STRENGTH_HIGHZ, VALUE_LOW } from '../constants.js';
-import { driveStrength, driveMask, MASK_LOW, MASK_HIGH } from '../drive.js';
 import { defineModel, WAKE_PIN } from './registry.js';
+import { refreshBridge } from './conduction.js';
 
 const CONTACT_DELAY_NS = 1;
 
-/**
- * Passes `fromPin`'s net through to `toPin` at full strength, or opens the
- * contact. Reads the source net excluding this element's own contribution, so
- * the contact cannot latch onto the value it is itself asserting.
- */
-function conduct(ctx, inst, fromPin, toPin, closed) {
-	if (!closed) {
-		ctx.drive(inst, toPin, STRENGTH_HIGHZ, VALUE_LOW, CONTACT_DELAY_NS);
-		return;
-	}
-	const drive = ctx.driveExcludingSelf(inst, fromPin);
-	const strength = driveStrength(drive);
-	const mask = driveMask(drive);
-	// A source that is itself unresolved (both polarities present) passes
-	// nothing: there is no single value to conduct.
-	if (strength === STRENGTH_HIGHZ || (mask !== MASK_LOW && mask !== MASK_HIGH)) {
-		ctx.drive(inst, toPin, STRENGTH_HIGHZ, VALUE_LOW, CONTACT_DELAY_NS);
-		return;
-	}
-	ctx.drive(inst, toPin, strength, mask === MASK_HIGH ? 1 : 0, CONTACT_DELAY_NS);
-}
-
-function refreshContact(ctx, inst, a, b, closed) {
-	conduct(ctx, inst, a, b, closed);
-	conduct(ctx, inst, b, a, closed);
+/** Closes or opens the contact bridging `a` and `b`. */
+function setContact(ctx, inst, a, b, closed) {
+	refreshBridge(ctx, inst, a, b, closed, CONTACT_DELAY_NS);
 }
 
 /* ------------------------------------------------------------------ *
@@ -70,12 +42,12 @@ defineModel({
 	},
 
 	init(ctx, inst) {
-		refreshContact(ctx, inst, BUTTON_A, BUTTON_B, inst.state.pressed);
+		setContact(ctx, inst, BUTTON_A, BUTTON_B, inst.state.pressed);
 	},
 
 	evaluate(ctx, inst, wake) {
 		if (wake.reason === WAKE_PIN && wake.pin !== BUTTON_A && wake.pin !== BUTTON_B) return;
-		refreshContact(ctx, inst, BUTTON_A, BUTTON_B, inst.state.pressed);
+		setContact(ctx, inst, BUTTON_A, BUTTON_B, inst.state.pressed);
 	},
 
 	/** `{ type:"input", uid, value }` — value is a boolean: pressed or released. */
@@ -83,7 +55,7 @@ defineModel({
 		const pressed = value === true || value?.pressed === true;
 		if (inst.state.pressed === pressed) return;
 		inst.state.pressed = pressed;
-		refreshContact(ctx, inst, BUTTON_A, BUTTON_B, pressed);
+		setContact(ctx, inst, BUTTON_A, BUTTON_B, pressed);
 	},
 });
 
@@ -116,7 +88,7 @@ defineModel({
 	init(ctx, inst) {
 		for (let k = 1; k <= DIP_SWITCH_COUNT; k++) {
 			const [a, b] = dipPins(k);
-			refreshContact(ctx, inst, a, b, inst.state.on[k - 1] === 1);
+			setContact(ctx, inst, a, b, inst.state.on[k - 1] === 1);
 		}
 	},
 
@@ -129,7 +101,7 @@ defineModel({
 		if (wake.reason !== WAKE_PIN) {
 			for (let k = 1; k <= DIP_SWITCH_COUNT; k++) {
 				const [a, b] = dipPins(k);
-				refreshContact(ctx, inst, a, b, inst.state.on[k - 1] === 1);
+				setContact(ctx, inst, a, b, inst.state.on[k - 1] === 1);
 			}
 			return;
 		}
@@ -138,7 +110,7 @@ defineModel({
 		if (!(pin >= 0) || pin > 15) return;
 		const k = pin < DIP_SWITCH_COUNT ? pin + 1 : 16 - pin;
 		const [a, b] = dipPins(k);
-		refreshContact(ctx, inst, a, b, inst.state.on[k - 1] === 1);
+		setContact(ctx, inst, a, b, inst.state.on[k - 1] === 1);
 	},
 
 	/**
@@ -152,6 +124,6 @@ defineModel({
 		if (inst.state.on[k - 1] === on) return;
 		inst.state.on[k - 1] = on;
 		const [a, b] = dipPins(k);
-		refreshContact(ctx, inst, a, b, on === 1);
+		setContact(ctx, inst, a, b, on === 1);
 	},
 });

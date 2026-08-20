@@ -72,14 +72,32 @@ export function createTools(options) {
     let hoverHole = null;
     let hoverComponentUid = null;
 
+    // Cached canvas rect. pointermove is bound to `window` and needs the rect twice per
+    // event, and a high-poll mouse fires far more often than once per frame - reading it
+    // live forces a layout every time. Resize and scroll invalidate it explicitly; the
+    // TTL is the backstop for a layout shift that moves the canvas without either, so
+    // the rect is never more than RECT_TTL_MS stale.
+    let canvasRect = null;
+    let canvasRectAt = 0;
+    const RECT_TTL_MS = 250;
+
+    function bounds() {
+        const now = performance.now();
+        if (canvasRect === null || now - canvasRectAt > RECT_TTL_MS) {
+            canvasRect = canvas.getBoundingClientRect();
+            canvasRectAt = now;
+        }
+        return canvasRect;
+    }
+
     function screenPoint(event) {
-        const rect = canvas.getBoundingClientRect();
+        const rect = bounds();
         return { x: event.clientX - rect.left, y: event.clientY - rect.top };
     }
 
     /** Whether a pointer event happened over the canvas itself. */
     function isOverCanvas(event) {
-        const rect = canvas.getBoundingClientRect();
+        const rect = bounds();
         return event.clientX >= rect.left && event.clientX <= rect.right
             && event.clientY >= rect.top && event.clientY <= rect.bottom;
     }
@@ -480,6 +498,11 @@ export function createTools(options) {
         }
     }
 
+    const invalidateRect = () => { canvasRect = null; };
+
+    bag.on(window, 'resize', invalidateRect);
+    // Capture, so an ancestor scrolling the canvas out from under us also counts.
+    bag.on(window, 'scroll', invalidateRect, true);
     bag.on(canvas, 'pointerdown', onPointerDown);
     bag.on(window, 'pointermove', onPointerMove);
     bag.on(window, 'pointerup', onPointerUp);
@@ -504,6 +527,8 @@ export function createTools(options) {
             publishScene('dynamic', 'overlay');
         },
         refresh: publishScene,
+        /** Drop the cached canvas rect. Call whenever the canvas may have moved. */
+        invalidateRect,
         destroy() {
             bag.removeAll();
         }

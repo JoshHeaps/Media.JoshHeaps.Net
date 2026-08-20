@@ -42,6 +42,11 @@ export function createToolbar(root, handlers) {
 
     const addBoardButton = button('Add board', { className: 'bb-btn' });
 
+    // Last state written to the DOM. setSimState is called on every simulation frame,
+    // and writing unchanged text/disabled flags still invalidates layout on a
+    // wrapping toolbar, so identical calls stop here.
+    let lastSimSignature = null;
+
     const group = (className, children) => el('div', { className: `bb-toolbar-group ${className}`, children });
 
     const bar = el('div', {
@@ -92,6 +97,10 @@ export function createToolbar(root, handlers) {
          * rail-to-rail short - so the run button must visibly not take.
          */
         setSimState({ available, running, settled, halted, loaded }) {
+            const signature = `${!!available}|${!!running}|${!!settled}|${!!halted}|${!!loaded}`;
+            if (signature === lastSimSignature) return;
+            lastSimSignature = signature;
+
             runButton.disabled = !available || running || halted;
             pauseButton.disabled = !available || !running;
             stepButton.disabled = !available || running;

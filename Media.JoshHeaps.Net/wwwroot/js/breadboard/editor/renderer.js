@@ -62,9 +62,16 @@ export function createRenderer(container, viewport, palette, options = {}) {
     }
     canvases.overlay.tabIndex = 0;      // focusable, so the canvas can own keyboard
 
+    // Latest MEASURED size, in CSS pixels. Read straight after resize() so callers
+    // that fit the view can trust it.
     let cssWidth = 0;
     let cssHeight = 0;
     let dpr = 1;
+    // Size the backing stores currently hold. Reallocating them costs tens of MB of
+    // churn, so it happens once per frame at most, inside paint().
+    let appliedWidth = 0;
+    let appliedHeight = 0;
+    let appliedDpr = 0;
     const dirty = { board: true, static: true, dynamic: true, overlay: true };
     let frameHandle = null;
 
@@ -86,25 +93,33 @@ export function createRenderer(container, viewport, palette, options = {}) {
         simActive: false
     };
 
-    function syncCanvasSize() {
+    /** Read the container size. Cheap - one layout read, no canvas work. */
+    function measureContainer() {
         const rect = container.getBoundingClientRect();
         const nextDpr = window.devicePixelRatio || 1;
         const width = Math.max(1, Math.round(rect.width));
         const height = Math.max(1, Math.round(rect.height));
         if (width === cssWidth && height === cssHeight && nextDpr === dpr) return false;
-
         cssWidth = width;
         cssHeight = height;
         dpr = nextDpr;
+        return true;
+    }
+
+    /** Resize the backing stores to the measured size. Wipes them, so all layers dirty. */
+    function applyCanvasSize() {
+        if (cssWidth === appliedWidth && cssHeight === appliedHeight && dpr === appliedDpr) return;
+        appliedWidth = cssWidth;
+        appliedHeight = cssHeight;
+        appliedDpr = dpr;
         for (const name of LAYER_NAMES) {
             const canvas = canvases[name];
-            canvas.width = Math.round(width * dpr);
-            canvas.height = Math.round(height * dpr);
-            canvas.style.width = `${width}px`;
-            canvas.style.height = `${height}px`;
+            canvas.width = Math.round(cssWidth * dpr);
+            canvas.height = Math.round(cssHeight * dpr);
+            canvas.style.width = `${cssWidth}px`;
+            canvas.style.height = `${cssHeight}px`;
         }
-        invalidateAll();
-        return true;
+        for (const name of LAYER_NAMES) dirty[name] = true;
     }
 
     /** Apply the base dpr transform, then the world transform. */
@@ -335,6 +350,7 @@ export function createRenderer(container, viewport, palette, options = {}) {
 
     function paint() {
         frameHandle = null;
+        applyCanvasSize();
         for (const name of LAYER_NAMES) {
             if (!dirty[name]) continue;
             try {
@@ -387,7 +403,7 @@ export function createRenderer(container, viewport, palette, options = {}) {
         },
 
         resize() {
-            if (syncCanvasSize()) schedule();
+            if (measureContainer()) invalidateAll();
         },
 
         invalidate,

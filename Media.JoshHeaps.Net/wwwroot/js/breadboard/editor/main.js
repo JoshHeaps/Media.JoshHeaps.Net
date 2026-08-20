@@ -67,8 +67,14 @@ export function boot(root) {
         className: 'bb-workspace',
         children: [paletteHost, canvasContainer, propsHost]
     });
-    const shell = el('div', { className: 'bb-editor-shell', children: [toolbarHost, workspace, statusHost] });
+    const shell = el('div', { className: 'bb-editor-shell', children: [toolbarHost, workspace] });
     root.appendChild(shell);
+
+    // The status strip floats over the bottom of the canvas rather than sitting below
+    // it in the column. In the column, every message that appeared or timed out resized
+    // the canvas container, which reallocated all four backing stores and forced a full
+    // repaint - twice per message.
+    canvasContainer.appendChild(statusHost);
 
     const status = createStatus(statusHost);
 
@@ -91,6 +97,8 @@ export function boot(root) {
 
     let destroyed = false;
     let saving = false;
+    /** Pending properties-panel rebuild. See scheduleProperties. */
+    let propertiesFrame = null;
     let simLoadedOnce = false;
     /** Components named by a simulation warning, highlighted on the canvas. */
     const warnedUids = new Set();
@@ -121,7 +129,7 @@ export function boot(root) {
             if (!failed) status.clearWarnings();
             for (const warning of warnings) status.addWarning(warning);
             refreshSimState();
-            pushSimScene();
+            pushSimScene('dynamic', 'overlay');
             if (!failed && netCount > 0) {
                 status.info(`Simulation ready — ${netCount} net${netCount === 1 ? '' : 's'}.`);
             }
@@ -136,7 +144,7 @@ export function boot(root) {
             // Repaint here rather than waiting for an unrelated message: shortCircuit
             // and oscillation HALT the engine, so there may be no further frame at all -
             // and those are exactly the warnings whose components most need pointing at.
-            pushSimScene();
+            pushSimScene('dynamic', 'overlay');
             // A halt is worth an explicit message; the engine refuses to run into it.
             if (warning.kind === 'shortCircuit') {
                 status.error('Simulation halted: the supply rails are shorted together.');
@@ -151,7 +159,14 @@ export function boot(root) {
         }
     });
 
-    function pushSimScene() {
+    /**
+     * Hand the current simulation state to the renderer.
+     *
+     * Defaults to the dynamic layer alone. The overlay only shows simulation state
+     * through `warnedUids`, which changes on a warning - not on every frame - so
+     * callers that touch warnedUids pass 'dynamic', 'overlay' explicitly.
+     */
+    function pushSimScene(...layers) {
         renderer.setScene({
             netLevels: sim.state.netLevels,
             netOfStrip: sim.state.netOfStrip,
@@ -159,7 +174,20 @@ export function boot(root) {
             burned: sim.state.burned,
             warnedUids,
             simActive: sim.state.loaded
-        }, 'dynamic', 'overlay');
+        }, ...(layers.length > 0 ? layers : ['dynamic']));
+    }
+
+    /**
+     * Rebuild the properties panel at most once per frame. render() throws away and
+     * rebuilds the whole panel, and a component drag fires a circuit change on every
+     * pointermove, so calling it directly meant a full DOM teardown per mouse move.
+     */
+    function scheduleProperties() {
+        if (propertiesFrame !== null) return;
+        propertiesFrame = requestAnimationFrame(() => {
+            propertiesFrame = null;
+            if (!destroyed) properties.render(state);
+        });
     }
 
     function refreshSimState() {
@@ -237,7 +265,7 @@ export function boot(root) {
             status.clearWarnings();
             sim.reset();
             status.info('Simulation reset.');
-            pushSimScene();
+            pushSimScene('dynamic', 'overlay');
         },
         onSpeed: (eventsPerSecond) => sim.setSpeed(eventsPerSecond),
         onAddBoard: () => {
@@ -311,7 +339,7 @@ export function boot(root) {
             toolbar.setZoom(viewport.zoom);
             persistView();
         },
-        onSelectionChange: () => properties.render(state)
+        onSelectionChange: () => scheduleProperties()
     });
 
     palette.setActiveTool({ kind: 'select', type: null });
@@ -331,9 +359,14 @@ export function boot(root) {
         afterViewportChange();
     }
 
-    bag.on(window, 'resize', () => renderer.resize());
+    function onContainerResize() {
+        tools.invalidateRect();
+        renderer.resize();
+    }
+
+    bag.on(window, 'resize', onContainerResize);
     const resizeObserver = typeof ResizeObserver === 'function'
-        ? new ResizeObserver(() => renderer.resize())
+        ? new ResizeObserver(onContainerResize)
         : null;
     if (resizeObserver) resizeObserver.observe(canvasContainer);
 
@@ -353,7 +386,7 @@ export function boot(root) {
     state.subscribe((change) => {
         if (change.kind === 'circuit') {
             tools.refresh('board', 'static', 'dynamic', 'overlay');
-            properties.render(state);
+            scheduleProperties();
             reloadSim();
             autosave();
         } else if (change.kind === 'runtime') {
@@ -387,7 +420,7 @@ export function boot(root) {
             else afterViewportChange();
 
             tools.refresh('board', 'static', 'dynamic', 'overlay');
-            properties.render(state);
+            scheduleProperties();
             updateSaveState();
 
             if (sim.start()) sim.load(circuit);
@@ -408,6 +441,7 @@ export function boot(root) {
             reloadSim.cancel();
             autosave.cancel();
             persistView.cancel();
+            if (propertiesFrame !== null) cancelAnimationFrame(propertiesFrame);
             bag.removeAll();
             if (resizeObserver) resizeObserver.disconnect();
             tools.destroy();

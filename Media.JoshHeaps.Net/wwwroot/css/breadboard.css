@@ -502,7 +502,18 @@
 
 /* --- Status strip ---------------------------------------------------------- */
 
-.bb-status-host { flex: 0 0 auto; }
+/* Floats over the bottom of the canvas, NOT stacked below it. Sharing the column
+ * meant every message that appeared or timed out resized the canvas, which reallocated
+ * the backing stores and forced a full repaint. */
+.bb-status-host {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    /* The strip is often empty; the canvas under it must stay clickable. */
+    pointer-events: none;
+}
 
 .bb-status {
     display: flex;
@@ -510,8 +521,13 @@
     max-height: 11rem;
     overflow-y: auto;
     background: var(--bg-secondary);
-    border-top: 1px solid var(--border-primary);
+    pointer-events: auto;
 }
+
+/* Border on the groups rather than the panel: both collapse when empty, so an idle
+ * editor shows no stray rule across the canvas. */
+.bb-status-messages,
+.bb-status-warnings { border-top: 1px solid var(--border-primary); }
 
 .bb-status-messages:empty,
 .bb-status-warnings:not(.is-visible) { display: none; }
